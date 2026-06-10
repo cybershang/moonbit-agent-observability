@@ -58,6 +58,7 @@ pub struct Client {
   model : String
   api_key : String
   max_tokens : Int
+  capture_content : Bool
 }
 
 ///| Create a new GenAI client.
@@ -67,17 +68,21 @@ pub fn Client::new(
   model~ : String,
   api_key~ : String,
   max_tokens~ : Int = 1024,
+  capture_content~ : Bool = false,
 ) -> Client {
-  { provider_name, base_url, model, api_key, max_tokens }
+  { provider_name, base_url, model, api_key, max_tokens, capture_content }
 }
 
-///| Content capture toggle
-
-///| Check whether content capture is enabled via environment variable.
-/// Reads CAPTURE_CONTENT from env only (not .env file) to avoid async issues.
-fn is_capture_content_enabled() -> Bool {
-  let from_env = @env.get_env_var("CAPTURE_CONTENT").unwrap_or_else(fn() { "" })
-  from_env.to_lower() == "true"
+///| Create a client from a loaded `Settings` value.
+pub fn Client::from_settings(settings : Settings) -> Client {
+  Client::new(
+    provider_name=settings.provider_name,
+    base_url=settings.base_url,
+    model=settings.model,
+    api_key=settings.api_key,
+    max_tokens=settings.max_tokens,
+    capture_content=settings.capture_content,
+  )
 }
 
 ///| OpenTelemetry tracer
@@ -115,7 +120,6 @@ pub async fn Client::chat(
   messages : Array[Message],
   tools~ : Array[Tool] = [],
 ) -> LLMResponse {
-  let capture_content = is_capture_content_enabled()
   let tracer = get_llm_tracer()
   let builder = tracer
     .span_builder("gen_ai.chat")
@@ -136,7 +140,7 @@ pub async fn Client::chat(
   }
 
   // Capture user messages as events when enabled
-  if capture_content {
+  if self.capture_content {
     for i = 0; i < messages.length(); i = i + 1 {
       let msg = messages[i]
       if msg.role == "user" {
@@ -217,7 +221,7 @@ pub async fn Client::chat(
   }
 
   // Capture assistant response content when enabled
-  if capture_content {
+  if self.capture_content {
     match llm_resp.content {
       Some(text) => span.add_event("gen_ai.assistant.message", attributes=[
         @otel.KeyValue::new("message.content", String(text)),

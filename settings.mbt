@@ -1,6 +1,43 @@
 // Copyright (c) 2026 Yingjie Shang
 // agent-observability is licensed under Mulan PSL v2.
 
+///| Application settings loaded from environment variables or `.env` file.
+pub struct Settings {
+  // LLM provider
+  provider_name : String
+  base_url : String
+  model : String
+  api_key : String
+  max_tokens : Int
+  // Agent behavior
+  max_tool_turns : Int
+  // Observability
+  otel_stdout : Bool
+  capture_content : Bool
+}
+
+///| Load settings from environment variables or `.env` file.
+pub async fn Settings::from_env() -> Settings {
+  let api_key = env("LLM_API_KEY")
+  let provider_name = env("LLM_PROVIDER", default="stepfun")
+  let base_url = env("LLM_BASE_URL", default="https://api.stepfun.com/v1")
+  let model = env("LLM_MODEL", default="step-3.7-flash")
+  let max_tokens = parse_int(env("LLM_MAX_TOKENS", default="1024"), 1024)
+  let max_tool_turns = parse_int(env("AGENT_MAX_TOOL_TURNS", default="10"), 10)
+  let otel_stdout = env("OTEL_STDOUT").to_lower() == "true"
+  let capture_content = env("CAPTURE_CONTENT").to_lower() == "true"
+  {
+    provider_name,
+    base_url,
+    model,
+    api_key,
+    max_tokens,
+    max_tool_turns,
+    otel_stdout,
+    capture_content,
+  }
+}
+
 ///| Read a `.env` file and look up a key.
 pub async fn read_dotenv(key : String) -> String? {
   let content = try {
@@ -19,4 +56,24 @@ pub async fn read_dotenv(key : String) -> String? {
     }
   }
   None
+}
+
+///| Read a configuration value from the `.env` file or the process environment.
+pub async fn env(key : String, default~ : String = "") -> String {
+  read_dotenv(key).unwrap_or_else(fn() {
+    @env.get_env_var(key).unwrap_or_else(fn() { default })
+  })
+}
+
+///| Parse an integer from a string, returning the default on failure.
+pub fn parse_int(s : String, default : Int) -> Int {
+  match s.trim() {
+    "" => default
+    text =>
+      try {
+        @string.parse_int(text)
+      } catch {
+        _ => default
+      }
+  }
 }
