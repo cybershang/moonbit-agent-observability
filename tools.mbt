@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Yingjie Shang
+// agent-observability is licensed under Mulan PSL v2.
+
 ///| Available tools for the LLM.
 pub let tools : Array[Tool] = [
   Tool::new(

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Yingjie Shang
+// agent-observability is licensed under Mulan PSL v2.
+
 ///|
 async fn main {
   // Initialize OpenTelemetry SDK only when OTEL_STDOUT=true

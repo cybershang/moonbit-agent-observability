@@ -125,3 +125,8 @@ agent-observability/
 | 构建目标 | Native |
 | LLM 提供商 | StepFun API |
 | 可观测性 | OpenTelemetry（规划中） |
+
+## 许可证
+
+本项目采用 [木兰宽松许可证，第 2 版](http://license.coscl.org.cn/MulanPSL2)（Mulan PSL v2）开源许可。
+Copyright (c) 2026 Yingjie Shang
