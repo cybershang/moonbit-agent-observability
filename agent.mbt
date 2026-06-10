@@ -39,10 +39,13 @@ pub struct AgentTurnResult {
 pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
   self.messages.push(Message::new(content=Some(prompt)))
 
+  let max_tool_turns = 10
+  let mut turn = 0
   let mut has_tool_calls = true
   let mut final_reply = ""
   let executed : Array[ToolCallRecord] = []
-  while has_tool_calls {
+  while has_tool_calls && turn < max_tool_turns {
+    turn = turn + 1
     let response = self.client.chat(self.messages, tools=self.tools)
     if response.finish_reason == "tool_calls" {
       // Add assistant message with tool_calls
@@ -68,6 +71,11 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
         None => ""
       }
     }
+  }
+
+  // If we hit the turn limit without a final reply, report it
+  if has_tool_calls {
+    final_reply = "[Agent reached maximum tool-call turns without producing a final reply.]"
   }
 
   { reply: final_reply, tool_calls: executed }
