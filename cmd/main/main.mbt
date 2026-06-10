@@ -13,6 +13,17 @@ async fn main {
     @sdk.set_tracer_provider(provider)
   }
 
+  // Create a StepFun client
+  let api_key = @agent.read_dotenv("STEPFUN_API_KEY").unwrap_or_else(fn() {
+    @env.get_env_var("STEPFUN_API_KEY").unwrap_or_else(fn() { "" })
+  })
+  let client = @agent.Client::new(
+    provider_name="stepfun",
+    base_url="https://api.stepfun.com/v1",
+    model="step-3.7-flash",
+    api_key~,
+  )
+
   // Step 8: REPL with continuous dialogue and auto tool-call loop
   let messages = []
   while true {
@@ -29,7 +40,7 @@ async fn main {
     // LLM request loop: handle tool calls automatically
     let mut has_tool_calls = true
     while has_tool_calls {
-      let response = @agent.llm_request(messages, tools=@agent.tools)
+      let response = client.chat(messages, tools=@agent.tools)
       if response.finish_reason == "tool_calls" {
         // Add assistant message with tool_calls
         messages.push(@agent.Message::new(

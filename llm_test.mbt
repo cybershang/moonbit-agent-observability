@@ -10,8 +10,17 @@ async test "LLM Request" {
     .build()
   @sdk.set_tracer_provider(provider)
 
+  let api_key = read_dotenv("STEPFUN_API_KEY").unwrap_or_else(fn() {
+    @env.get_env_var("STEPFUN_API_KEY").unwrap_or_else(fn() { "" })
+  })
+  let client = Client::new(
+    provider_name="stepfun",
+    base_url="https://api.stepfun.com/v1",
+    model="step-3.7-flash",
+    api_key~,
+  )
   let messages = [Message::new(content=Some("现在是几点？"))]
-  let response = llm_request(messages)
+  let response = client.chat(messages)
   @debug.debug(response)
 
   ignore(provider.shutdown())
@@ -26,9 +35,19 @@ async test "LLM Tool Call" {
     .build()
   @sdk.set_tracer_provider(provider)
 
+  let api_key = read_dotenv("STEPFUN_API_KEY").unwrap_or_else(fn() {
+    @env.get_env_var("STEPFUN_API_KEY").unwrap_or_else(fn() { "" })
+  })
+  let client = Client::new(
+    provider_name="stepfun",
+    base_url="https://api.stepfun.com/v1",
+    model="step-3.7-flash",
+    api_key~,
+  )
+
   // Round 1: User asks about Beijing weather
   let messages = [Message::new(content=Some("北京今天天气怎么样？"))]
-  let response1 = llm_request(messages, tools=tools)
+  let response1 = client.chat(messages, tools=tools)
   @debug.debug(response1)
 
   // If LLM requests tool calls, execute them and continue
@@ -52,7 +71,7 @@ async test "LLM Tool Call" {
     }
 
     // Round 2: Send tool results back to LLM
-    let response2 = llm_request(messages, tools=tools)
+    let response2 = client.chat(messages, tools=tools)
     @debug.debug(response2)
     match response2.content {
       Some(content) => @stdio.stdout.write(content + "\n")
