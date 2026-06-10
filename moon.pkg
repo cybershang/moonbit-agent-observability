@@ -5,4 +5,9 @@ import {
   "moonbitlang/async/process" @process,
   "moonbitlang/core/env" @env,
   "moonbitlang/core/json" @json,
+  "moonbit-community/opentelemetry" @otel,
+  "moonbit-community/opentelemetry/interface/trace" @trace,
+  "moonbit-community/opentelemetry/sdk" @sdk,
+  "moonbit-community/opentelemetry/print" @print,
+  "moonbit-community/opentelemetry/semantics/trace" @semtrace,
 }

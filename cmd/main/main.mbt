@@ -1,5 +1,12 @@
 ///|
 async fn main {
+  // Initialize OpenTelemetry SDK with stdout exporter
+  let exporter = @print.SpanExporter::new()
+  let provider = @sdk.tracer_provider_builder()
+    .with_simple_exporter(exporter.into_span_exporter())
+    .build()
+  @sdk.set_tracer_provider(provider)
+
   // Step 8: REPL with continuous dialogue and auto tool-call loop
   let messages = []
   while true {
@@ -43,6 +50,9 @@ async fn main {
     }
     @stdio.stdout.write("\n")
   }
+
+  // Shutdown provider to flush any pending spans
+  ignore(provider.shutdown())
 }
 
 async test "Simple Http Request" {
@@ -58,12 +68,28 @@ async test "Simple Http Request" {
 }
 
 async test "LLM Request" {
+  // Setup OTel with print exporter for test visibility
+  let exporter = @print.SpanExporter::new()
+  let provider = @sdk.tracer_provider_builder()
+    .with_simple_exporter(exporter.into_span_exporter())
+    .build()
+  @sdk.set_tracer_provider(provider)
+
   let messages = [@agent.Message::new(content=Some("现在是几点？"))]
   let response = @agent.llm_request(messages)
   @debug.debug(response)
+
+  ignore(provider.shutdown())
 }
 
 async test "LLM Tool Call" {
+  // Setup OTel with print exporter for test visibility
+  let exporter = @print.SpanExporter::new()
+  let provider = @sdk.tracer_provider_builder()
+    .with_simple_exporter(exporter.into_span_exporter())
+    .build()
+  @sdk.set_tracer_provider(provider)
+
   // Round 1: User asks about Beijing weather
   let messages = [@agent.Message::new(content=Some("北京今天天气怎么样？"))]
   let response1 = @agent.llm_request(messages, tools=@agent.tools)
@@ -102,4 +128,6 @@ async test "LLM Tool Call" {
       None => ()
     }
   }
+
+  ignore(provider.shutdown())
 }

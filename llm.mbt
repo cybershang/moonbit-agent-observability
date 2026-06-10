@@ -51,16 +51,64 @@ pub struct LLMResponse {
 } derive(Debug)
 
 // ============================================================================
+// OpenTelemetry Tracer (lazy-init so library code works before SDK setup)
+// ============================================================================
+
+///| Lazily-initialized tracer for the LLMGateway module.
+let llm_tracer : Ref[@trace.Tracer?] = Ref::new(None)
+
+///| Get or create the LLMGateway tracer.
+fn get_llm_tracer() -> @trace.Tracer {
+  match llm_tracer.val {
+    Some(t) => t
+    None => {
+      let t = @otel.tracer("yingjie/agent-observability/llm", version=Some("0.1.0"))
+      llm_tracer.val = Some(t)
+      t
+    }
+  }
+}
+
+// ============================================================================
 // Public API
 // ============================================================================
 
 ///| Send a single request to the LLM with optional tools.
+///
+/// This function is instrumented with OpenTelemetry GenAI semantic conventions:
+/// - Span name: `gen_ai.chat`
+/// - `gen_ai.system` = "stepfun"
+/// - `gen_ai.operation.name` = "chat"
+/// - `gen_ai.request.model` = model_name
+/// - `gen_ai.request.max_tokens` = max_tokens
+/// - `gen_ai.usage.input_tokens` (from response)
+/// - `gen_ai.usage.output_tokens` (from response)
+/// - `gen_ai.response.finish_reasons` (from response)
 pub async fn llm_request(
   messages : Array[Message],
   tools~ : Array[Tool] = [],
   model_name~ : String = "step-3.7-flash",
   max_tokens~ : Int = 1024,
 ) -> LLMResponse {
+  let tracer = get_llm_tracer()
+  let builder = tracer
+    .span_builder("gen_ai.chat")
+    .with_kind(@trace.Client)
+    .with_attributes([
+      @otel.KeyValue::new(@semtrace.GEN_AI_SYSTEM, String("stepfun")),
+      @otel.KeyValue::new(@semtrace.GEN_AI_OPERATION_NAME, String("chat")),
+      @otel.KeyValue::new(@semtrace.GEN_AI_REQUEST_MODEL, String(model_name)),
+      @otel.KeyValue::new(@semtrace.GEN_AI_REQUEST_MAX_TOKENS, Int64(max_tokens.to_int64())),
+    ])
+  let span = tracer.build(builder)
+
+  // Record tool count if tools are present
+  if !tools.is_empty() {
+    span.set_attribute(
+      @otel.KeyValue::new("gen_ai.request.tool_count", Int64(tools.length().to_int64())),
+    )
+  }
+
   let api_key = read_dotenv("STEPFUN_API_KEY").unwrap_or_else(fn() {
     @env.get_env_var("STEPFUN_API_KEY").unwrap_or_else(fn() { "" })
   })
@@ -69,15 +117,70 @@ pub async fn llm_request(
     "Content-Type": "application/json",
     "Authorization": "Bearer " + api_key,
   }
+
+  // HTTP POST with error handling
   let (response, resp_body) = @http.post(
     "https://api.stepfun.com/v1/chat/completions",
     body_json,
     headers~,
   )
+
   guard response.code == 200 else {
+    span.set_status(@trace.Status::error(description=Some("HTTP \{response.code}")))
+    span.add_event("llm.http_error", attributes=[
+      @otel.KeyValue::new("http.status_code", Int64(response.code.to_int64())),
+    ])
+    span.end()
     abort("LLM request failed with status: \{response.code}")
   }
-  parse_llm_response(resp_body.json())
+
+  let data = resp_body.json()
+  let llm_resp = parse_llm_response(data)
+
+  // Extract usage from response if available
+  let usage = if data is { "usage": usage_obj, .. } {
+    Some(usage_obj)
+  } else {
+    None
+  }
+
+  match usage {
+    Some(u) => {
+      if u is { "prompt_tokens": Number(pt, ..), .. } {
+        span.set_attribute(
+          @otel.KeyValue::new(@semtrace.GEN_AI_USAGE_INPUT_TOKENS, Int64(pt.to_int64())),
+        )
+      }
+      if u is { "completion_tokens": Number(ct, ..), .. } {
+        span.set_attribute(
+          @otel.KeyValue::new(@semtrace.GEN_AI_USAGE_OUTPUT_TOKENS, Int64(ct.to_int64())),
+        )
+      }
+    }
+    None => ()
+  }
+
+  // Record finish reason
+  if llm_resp.finish_reason != "" {
+    span.set_attribute(
+      @otel.KeyValue::new(@semtrace.GEN_AI_RESPONSE_FINISH_REASONS, String(llm_resp.finish_reason)),
+    )
+  }
+
+  // Record tool calls as events
+  if !llm_resp.tool_calls.is_empty() {
+    for call in llm_resp.tool_calls {
+      span.add_event("gen_ai.tool.call", attributes=[
+        @otel.KeyValue::new(@semtrace.GEN_AI_TOOL_CALL_ID, String(call.id)),
+        @otel.KeyValue::new(@semtrace.GEN_AI_TOOL_NAME, String(call.name)),
+      ])
+    }
+  }
+
+  span.set_status(@trace.Status::ok())
+  span.end()
+
+  llm_resp
 }
 
 ///| Convert a `Message` to JSON for the API request.
