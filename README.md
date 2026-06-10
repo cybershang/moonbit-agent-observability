@@ -71,7 +71,7 @@ Agent基础交互，包含多轮对话和工具调用:
 | **Agent** | `agent.mbt` | 对话编排：维护消息历史、自动 tool call 循环、返回结构化结果 |
 | **Client** | `llm.mbt` | 通用 GenAI 客户端：封装 HTTP 调用、管理消息类型、OTel GenAI 插桩 |
 | **ToolRegistry** | `tools.mbt` | 工具定义表，供 Agent 注册到 LLM |
-| **Settings** | `settings.mbt` | `.env` 文件读取辅助 |
+| **Settings** | `settings.mbt` | 集中管理所有运行时配置：`Settings` struct + `from_env()` |
 | **REPL 入口** | `cmd/main/main.mbt` | 配置加载、初始化 OTel、启动交互循环 |
 
 ## 快速开始
@@ -102,6 +102,8 @@ cp .env.example .env
 | `AGENT_MAX_TOOL_TURNS` | Agent 自动 tool call 最大轮数 | `10` |
 | `OTEL_STDOUT` | 是否输出 OTel trace 到 stdout | `false` |
 | `CAPTURE_CONTENT` | 是否在 span 中采集用户/助手消息内容 | `false` |
+
+所有配置在运行时被加载到 `Settings` 结构体中，随后传递给 `Client` 与 `Agent`，避免在业务代码中散落环境变量读取逻辑。
 
 ### 运行
 
@@ -152,7 +154,7 @@ agent-observability/
 ├── llm_test.mbt                # Client 白盒测试
 ├── agent.mbt                   # Agent：对话编排 + tool 执行
 ├── tools.mbt                   # ToolRegistry：工具定义
-├── settings.mbt                # .env 读取辅助
+├── settings.mbt                # Settings：集中配置管理 + .env 读取辅助
 ├── .env.example                # 配置模板
 ├── cmd/
 │   └── main/
