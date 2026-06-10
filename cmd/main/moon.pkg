@@ -3,6 +3,7 @@ import {
   "moonbitlang/async" @async,
   "moonbitlang/async/stdio" @stdio,
   "moonbit-community/opentelemetry/sdk" @sdk,
+  "moonbit-community/opentelemetry/otlp" @otlp,
   "moonbit-community/opentelemetry/print" @print,
 }
 

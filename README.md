@@ -132,12 +132,35 @@ moon test
   - `gen_ai.request.model` = 当前请求模型
   - `gen_ai.request.max_tokens` = 最大 token 数
   - `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` = 用量（从响应解析）
+  - `gen_ai.response.id` / `gen_ai.response.model` = 响应元数据（从响应解析）
   - `gen_ai.response.finish_reasons` = 响应结束原因
-- **Events**：
-  - `gen_ai.tool.call`：记录 LLM 请求的 tool call ID 与名称
-  - `gen_ai.user.message` / `gen_ai.assistant.message`：当 `CAPTURE_CONTENT=true` 时记录消息内容
+  - `gen_ai.input.messages` / `gen_ai.output.messages`：当 `CAPTURE_CONTENT=true` 时以 JSON 字符串记录消息内容
 
 通过设置 `OTEL_STDOUT=true` 可在 stdout 查看 trace 输出；设置 `CAPTURE_CONTENT=true` 可开启消息内容采集（默认关闭，避免敏感信息泄露）。
+
+默认情况下，应用通过 **OTLP/HTTP** 将 trace 导出到 `http://localhost:4318`，可直接对接本地 OpenTelemetry Collector。
+
+### 本地可观测性栈
+
+项目提供了最小化的本地 Collector + Jaeger 组合：
+
+```bash
+cd deploy/minimum
+docker compose up -d
+```
+
+启动后：
+- OTLP HTTP receiver: `http://localhost:4318`
+- OTLP gRPC receiver: `http://localhost:4317`
+- Jaeger UI: `http://localhost:16686`
+
+运行 REPL 并导出 trace 到 Collector（保持 `.env` 中 `OTEL_STDOUT=false` 或直接覆盖环境变量）：
+
+```bash
+OTEL_STDOUT=false moon run cmd/main
+```
+
+发送一条消息后，打开 http://localhost:16686 即可在 Jaeger 中查看 `gen_ai.chat` span 及完整属性。
 
 Agent 编排层（`Agent::run`）与工具执行层的 trace 插桩尚未实现，后续计划补充：
 - Agent turn 级别的 span
@@ -156,6 +179,10 @@ agent-observability/
 ├── tools.mbt                   # ToolRegistry：工具定义
 ├── settings.mbt                # Settings：集中配置管理 + .env 读取辅助
 ├── .env.example                # 配置模板
+├── deploy/
+│   └── minimum/                # 本地最小化 OTel Collector + Jaeger
+│       ├── docker-compose.yml
+│       └── otel-collector-config.yml
 ├── cmd/
 │   └── main/
 │       ├── moon.pkg            # 可执行包配置
