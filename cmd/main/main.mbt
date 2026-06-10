@@ -1,20 +1,24 @@
 ///|
 async fn main {
-  // Step 4: Use the abstracted llm_request helper
+  // Step 5: Use structured Message and LLMResponse types
   let api_key = "YOUR_API_KEY"
-  let messages : Array[Map[String, Json]] = []
+  let messages : Array[@agent.Message] = []
 
   // Round 1
-  messages.push({ "role": "user", "content": "北京今天天气怎么样？" })
-  let data1 = @agent.llm_request(messages, api_key)
-  @debug.debug(data1)
-  let reply1 = @agent.extract_content(data1)
-  messages.push({ "role": "assistant", "content": reply1 })
+  messages.push(@agent.Message::new(content=Some("北京今天天气怎么样？")))
+  let response1 = @agent.llm_request(messages, api_key)
+  @debug.debug(response1)
+  match response1.content {
+    Some(content) => messages.push(@agent.Message::new(role="assistant", content=Some(content)))
+    None => ()
+  }
 
   // Round 2
-  messages.push({ "role": "user", "content": "那上海呢？" })
-  let data2 = @agent.llm_request(messages, api_key)
-  @debug.debug(data2)
-  let reply2 = @agent.extract_content(data2)
-  @stdio.stdout.write(reply2)
+  messages.push(@agent.Message::new(content=Some("那上海呢？")))
+  let response2 = @agent.llm_request(messages, api_key)
+  @debug.debug(response2)
+  match response2.content {
+    Some(content) => @stdio.stdout.write(content)
+    None => ()
+  }
 }
