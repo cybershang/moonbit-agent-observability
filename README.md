@@ -2,6 +2,9 @@
 
 基于 MoonBit 实现的精简 AI Agent，演示 Agent 核心运行链路的 OpenTelemetry 可观测性插桩。
 
+## 演示Demo
+- 实现了基础的交互和LLM插桩:https://www.bilibili.com/video/BV1n4EZ61EmU
+
 ## 架构
 
 ```
