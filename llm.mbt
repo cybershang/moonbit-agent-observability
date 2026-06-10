@@ -69,7 +69,7 @@ fn is_capture_content_enabled() -> Bool {
 // ============================================================================
 
 ///| Lazily-initialized tracer for the LLMGateway module.
-let llm_tracer : Ref[@trace.Tracer?] = Ref::new(None)
+let llm_tracer : Ref[@trace.Tracer?] = Ref(None)
 
 ///| Get or create the LLMGateway tracer.
 fn get_llm_tracer() -> @trace.Tracer {

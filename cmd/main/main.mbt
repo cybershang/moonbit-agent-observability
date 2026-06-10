@@ -41,7 +41,7 @@ async fn main {
           @stdio.stdout.write("\n[Tool Call] " + call.name + "(" + call.arguments + ")\n")
           let result = @agent.execute_tool(call.name, call.arguments)
           let display_result = if result.length() > 200 {
-            result.substring(start=0, end=200) + "... (truncated)"
+            result[:200].to_owned() + "... (truncated)"
           } else {
             result
           }
