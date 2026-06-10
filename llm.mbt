@@ -51,6 +51,17 @@ pub struct LLMResponse {
 } derive(Debug)
 
 // ============================================================================
+// Content capture toggle (controlled by CAPTURE_CONTENT env var)
+// ============================================================================
+
+///| Check whether content capture is enabled via environment variable.
+/// Reads CAPTURE_CONTENT from env only (not .env file) to avoid async issues.
+fn is_capture_content_enabled() -> Bool {
+  let from_env = @env.get_env_var("CAPTURE_CONTENT").unwrap_or_else(fn() { "" })
+  from_env.to_lower() == "true"
+}
+
+// ============================================================================
 // OpenTelemetry Tracer (lazy-init so library code works before SDK setup)
 // ============================================================================
 
@@ -90,6 +101,7 @@ pub async fn llm_request(
   model_name~ : String = "step-3.7-flash",
   max_tokens~ : Int = 1024,
 ) -> LLMResponse {
+  let capture_content = is_capture_content_enabled()
   let tracer = get_llm_tracer()
   let builder = tracer
     .span_builder("gen_ai.chat")
@@ -107,6 +119,22 @@ pub async fn llm_request(
     span.set_attribute(
       @otel.KeyValue::new("gen_ai.request.tool_count", Int64(tools.length().to_int64())),
     )
+  }
+
+  // Capture user messages as events when enabled
+  if capture_content {
+    for i = 0; i < messages.length(); i = i + 1 {
+      let msg = messages[i]
+      if msg.role == "user" {
+        match msg.content {
+          Some(text) => span.add_event("gen_ai.user.message", attributes=[
+            @otel.KeyValue::new("message.index", Int64(i.to_int64())),
+            @otel.KeyValue::new("message.content", String(text)),
+          ])
+          None => ()
+        }
+      }
+    }
   }
 
   let api_key = read_dotenv("STEPFUN_API_KEY").unwrap_or_else(fn() {
@@ -174,6 +202,16 @@ pub async fn llm_request(
         @otel.KeyValue::new(@semtrace.GEN_AI_TOOL_CALL_ID, String(call.id)),
         @otel.KeyValue::new(@semtrace.GEN_AI_TOOL_NAME, String(call.name)),
       ])
+    }
+  }
+
+  // Capture assistant response content when enabled
+  if capture_content {
+    match llm_resp.content {
+      Some(text) => span.add_event("gen_ai.assistant.message", attributes=[
+        @otel.KeyValue::new("message.content", String(text)),
+      ])
+      None => ()
     }
   }
 
