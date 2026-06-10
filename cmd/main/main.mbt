@@ -34,7 +34,7 @@ async fn main {
   }
 
   // Load LLM configuration from environment / .env
-  let api_key = env("STEPFUN_API_KEY")
+  let api_key = env("LLM_API_KEY")
   let provider_name = env("LLM_PROVIDER", default="stepfun")
   let base_url = env("LLM_BASE_URL", default="https://api.stepfun.com/v1")
   let model = env("LLM_MODEL", default="step-3.7-flash")
