@@ -4,6 +4,7 @@ import {
   "moonbitlang/async/http" @http,
   "moonbitlang/async/stdio" @stdio,
   "moonbitlang/core/debug" @debug,
+  "moonbitlang/core/env" @env,
   "moonbit-community/opentelemetry/sdk" @sdk,
   "moonbit-community/opentelemetry/print" @print,
 }
