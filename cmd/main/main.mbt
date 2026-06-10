@@ -24,8 +24,10 @@ async fn main {
     api_key~,
   )
 
-  // Step 8: REPL with continuous dialogue and auto tool-call loop
-  let messages = []
+  // Create the agent with available tools
+  let agent = @agent.Agent::new(client, tools=@agent.tools)
+
+  // REPL with continuous dialogue
   while true {
     @stdio.stdout.write("> ")
     let prompt = match @stdio.stdin.read_until("\n") {
@@ -35,45 +37,18 @@ async fn main {
     if prompt == "exit" || prompt == "quit" {
       break
     }
-    messages.push(@agent.Message::new(content=Some(prompt)))
 
-    // LLM request loop: handle tool calls automatically
-    let mut has_tool_calls = true
-    while has_tool_calls {
-      let response = client.chat(messages, tools=@agent.tools)
-      if response.finish_reason == "tool_calls" {
-        // Add assistant message with tool_calls
-        messages.push(@agent.Message::new(
-          role="assistant",
-          tool_calls=Some(response.tool_calls),
-        ))
-        // Execute each tool call and add tool results
-        for call in response.tool_calls {
-          @stdio.stdout.write("\n[Tool Call] " + call.name + "(" + call.arguments + ")\n")
-          let result = @agent.execute_tool(call.name, call.arguments)
-          let display_result = if result.length() > 200 {
-            result[:200].to_owned() + "... (truncated)"
-          } else {
-            result
-          }
-          @stdio.stdout.write("[Tool Result] " + display_result + "\n")
-          messages.push(@agent.Message::new(
-            role="tool",
-            content=Some(result),
-            tool_call_id=Some(call.id),
-          ))
-        }
-        // Continue loop to send tool results back to LLM
+    let turn = agent.run(prompt)
+    for record in turn.tool_calls {
+      @stdio.stdout.write("\n[Tool Call] " + record.call.name + "(" + record.call.arguments + ")\n")
+      let display_result = if record.result.length() > 200 {
+        record.result[:200].to_owned() + "... (truncated)"
       } else {
-        has_tool_calls = false
-        match response.content {
-          Some(content) => @stdio.stdout.write(content)
-          None => ()
-        }
+        record.result
       }
+      @stdio.stdout.write("[Tool Result] " + display_result + "\n")
     }
+    @stdio.stdout.write(turn.reply)
     @stdio.stdout.write("\n")
   }
 }
-
-
