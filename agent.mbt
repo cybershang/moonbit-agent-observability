@@ -10,11 +10,16 @@ pub struct Agent {
   client : Client
   messages : Array[Message]
   tools : Array[Tool]
+  max_tool_turns : Int
 }
 
 ///| Create a new agent with the given client and optional tools.
-pub fn Agent::new(client : Client, tools~ : Array[Tool] = []) -> Agent {
-  { client, messages: [], tools }
+pub fn Agent::new(
+  client : Client,
+  tools~ : Array[Tool] = [],
+  max_tool_turns~ : Int = 10,
+) -> Agent {
+  { client, messages: [], tools, max_tool_turns }
 }
 
 ///| Record of a single tool call executed during an agent turn.
@@ -39,12 +44,11 @@ pub struct AgentTurnResult {
 pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
   self.messages.push(Message::new(content=Some(prompt)))
 
-  let max_tool_turns = 10
   let mut turn = 0
   let mut has_tool_calls = true
   let mut final_reply = ""
   let executed : Array[ToolCallRecord] = []
-  while has_tool_calls && turn < max_tool_turns {
+  while has_tool_calls && turn < self.max_tool_turns {
     turn = turn + 1
     let response = self.client.chat(self.messages, tools=self.tools)
     if response.finish_reason == "tool_calls" {
