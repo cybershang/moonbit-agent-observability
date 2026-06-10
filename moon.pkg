@@ -1,0 +1,4 @@
+import {
+  "moonbitlang/async" @async,
+  "moonbitlang/async/http" @http,
+}
