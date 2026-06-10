@@ -35,7 +35,14 @@ async fn main {
         ))
         // Execute each tool call and add tool results
         for call in response.tool_calls {
+          @stdio.stdout.write("\n[Tool Call] " + call.name + "(" + call.arguments + ")\n")
           let result = @agent.execute_tool(call.name, call.arguments)
+          let display_result = if result.length() > 200 {
+            result.substring(start=0, end=200) + "... (truncated)"
+          } else {
+            result
+          }
+          @stdio.stdout.write("[Tool Result] " + display_result + "\n")
           messages.push(@agent.Message::new(
             role="tool",
             content=Some(result),
