@@ -1,11 +1,14 @@
 ///|
 async fn main {
-  // Initialize OpenTelemetry SDK with stdout exporter
-  let exporter = @print.SpanExporter::new()
-  let provider = @sdk.tracer_provider_builder()
-    .with_simple_exporter(exporter.into_span_exporter())
-    .build()
-  @sdk.set_tracer_provider(provider)
+  // Initialize OpenTelemetry SDK only when OTEL_STDOUT=true
+  let otel_stdout = @env.get_env_var("OTEL_STDOUT").unwrap_or_else(fn() { "" })
+  if otel_stdout.to_lower() == "true" {
+    let exporter = @print.SpanExporter::new()
+    let provider = @sdk.tracer_provider_builder()
+      .with_simple_exporter(exporter.into_span_exporter())
+      .build()
+    @sdk.set_tracer_provider(provider)
+  }
 
   // Step 8: REPL with continuous dialogue and auto tool-call loop
   let messages = []
@@ -50,9 +53,6 @@ async fn main {
     }
     @stdio.stdout.write("\n")
   }
-
-  // Shutdown provider to flush any pending spans
-  ignore(provider.shutdown())
 }
 
 async test "Simple Http Request" {
