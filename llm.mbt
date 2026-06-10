@@ -51,6 +51,26 @@ pub struct LLMResponse {
   finish_reason : String
 } derive(Debug)
 
+///| A client for a GenAI provider.
+pub struct Client {
+  provider_name : String
+  base_url : String
+  model : String
+  api_key : String
+  max_tokens : Int
+}
+
+///| Create a new GenAI client.
+pub fn Client::new(
+  provider_name~ : String,
+  base_url~ : String,
+  model~ : String,
+  api_key~ : String,
+  max_tokens~ : Int = 1024,
+) -> Client {
+  { provider_name, base_url, model, api_key, max_tokens }
+}
+
 ///| Content capture toggle
 
 ///| Check whether content capture is enabled via environment variable.
@@ -79,22 +99,21 @@ fn get_llm_tracer() -> @trace.Tracer {
 
 ///| Public API
 
-///| Send a single request to the LLM with optional tools.
+///| Send a chat request to the configured GenAI provider.
 ///
-/// This function is instrumented with OpenTelemetry GenAI semantic conventions:
+/// This method is instrumented with OpenTelemetry GenAI semantic conventions:
 /// - Span name: `gen_ai.chat`
-/// - `gen_ai.system` = "stepfun"
 /// - `gen_ai.operation.name` = "chat"
-/// - `gen_ai.request.model` = model_name
+/// - `gen_ai.provider.name` = provider_name
+/// - `gen_ai.request.model` = model
 /// - `gen_ai.request.max_tokens` = max_tokens
 /// - `gen_ai.usage.input_tokens` (from response)
 /// - `gen_ai.usage.output_tokens` (from response)
 /// - `gen_ai.response.finish_reasons` (from response)
-pub async fn llm_request(
+pub async fn Client::chat(
+  self : Client,
   messages : Array[Message],
   tools~ : Array[Tool] = [],
-  model_name~ : String = "step-3.7-flash",
-  max_tokens~ : Int = 1024,
 ) -> LLMResponse {
   let capture_content = is_capture_content_enabled()
   let tracer = get_llm_tracer()
@@ -102,10 +121,10 @@ pub async fn llm_request(
     .span_builder("gen_ai.chat")
     .with_kind(@trace.Client)
     .with_attributes([
-      @otel.KeyValue::new(@semtrace.GEN_AI_SYSTEM, String("stepfun")),
       @otel.KeyValue::new(@semtrace.GEN_AI_OPERATION_NAME, String("chat")),
-      @otel.KeyValue::new(@semtrace.GEN_AI_REQUEST_MODEL, String(model_name)),
-      @otel.KeyValue::new(@semtrace.GEN_AI_REQUEST_MAX_TOKENS, Int64(max_tokens.to_int64())),
+      @otel.KeyValue::new("gen_ai.provider.name", String(self.provider_name)),
+      @otel.KeyValue::new(@semtrace.GEN_AI_REQUEST_MODEL, String(self.model)),
+      @otel.KeyValue::new(@semtrace.GEN_AI_REQUEST_MAX_TOKENS, Int64(self.max_tokens.to_int64())),
     ])
   let span = tracer.build(builder)
 
@@ -132,18 +151,15 @@ pub async fn llm_request(
     }
   }
 
-  let api_key = read_dotenv("STEPFUN_API_KEY").unwrap_or_else(fn() {
-    @env.get_env_var("STEPFUN_API_KEY").unwrap_or_else(fn() { "" })
-  })
-  let body_json = build_request_json(messages, tools, model_name, max_tokens)
+  let body_json = build_request_json(messages, tools, self.model, self.max_tokens)
   let headers = {
     "Content-Type": "application/json",
-    "Authorization": "Bearer " + api_key,
+    "Authorization": "Bearer " + self.api_key,
   }
 
   // HTTP POST with error handling
   let (response, resp_body) = @http.post(
-    "https://api.stepfun.com/v1/chat/completions",
+    self.base_url + "/chat/completions",
     body_json,
     headers~,
   )
