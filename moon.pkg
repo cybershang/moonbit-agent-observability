@@ -8,6 +8,8 @@ import {
   "moonbit-community/opentelemetry" @otel,
   "moonbit-community/opentelemetry/interface/trace" @trace,
   "moonbit-community/opentelemetry/sdk" @sdk,
+  "moonbit-community/opentelemetry/sdk/trace" @sdktrace,
+  "moonbit-community/opentelemetry/sdk/error" @error,
   "moonbit-community/opentelemetry/print" @print,
   "moonbit-community/opentelemetry/semantics/trace" @semtrace,
 }
