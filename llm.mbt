@@ -1,9 +1,7 @@
 // Copyright (c) 2026 Yingjie Shang
 // agent-observability is licensed under Mulan PSL v2.
 
-// ============================================================================
-// Types
-// ============================================================================
+///| Types
 
 ///| A tool definition that can be registered with the LLM.
 pub struct Tool {
@@ -53,9 +51,7 @@ pub struct LLMResponse {
   finish_reason : String
 } derive(Debug)
 
-// ============================================================================
-// Content capture toggle (controlled by CAPTURE_CONTENT env var)
-// ============================================================================
+///| Content capture toggle
 
 ///| Check whether content capture is enabled via environment variable.
 /// Reads CAPTURE_CONTENT from env only (not .env file) to avoid async issues.
@@ -64,9 +60,7 @@ fn is_capture_content_enabled() -> Bool {
   from_env.to_lower() == "true"
 }
 
-// ============================================================================
-// OpenTelemetry Tracer (lazy-init so library code works before SDK setup)
-// ============================================================================
+///| OpenTelemetry tracer
 
 ///| Lazily-initialized tracer for the LLMGateway module.
 let llm_tracer : Ref[@trace.Tracer?] = Ref(None)
@@ -83,9 +77,7 @@ fn get_llm_tracer() -> @trace.Tracer {
   }
 }
 
-// ============================================================================
-// Public API
-// ============================================================================
+///| Public API
 
 ///| Send a single request to the LLM with optional tools.
 ///
@@ -255,9 +247,7 @@ pub fn ToolCall::to_json(self : ToolCall) -> Json {
   Json::object(obj)
 }
 
-// ============================================================================
-// Internal helpers
-// ============================================================================
+///| Internal helpers
 
 ///| Build the request JSON body.
 fn build_request_json(
