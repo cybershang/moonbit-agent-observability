@@ -58,11 +58,14 @@ pub async fn read_dotenv(key : String) -> String? {
   None
 }
 
-///| Read a configuration value from the `.env` file or the process environment.
+///| Read a configuration value from the process environment or `.env` file.
+///
+/// Resolution order: process environment > `.env` file > default.
 pub async fn env(key : String, default~ : String = "") -> String {
-  read_dotenv(key).unwrap_or_else(fn() {
-    @env.get_env_var(key).unwrap_or_else(fn() { default })
-  })
+  match @env.get_env_var(key) {
+    Some(value) => value
+    None => read_dotenv(key).unwrap_or(default)
+  }
 }
 
 ///| Parse an integer from a string, returning the default on failure.
