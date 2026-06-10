@@ -10,8 +10,8 @@ async test "LLM Request" {
     .build()
   @sdk.set_tracer_provider(provider)
 
-  let api_key = read_dotenv("STEPFUN_API_KEY").unwrap_or_else(fn() {
-    @env.get_env_var("STEPFUN_API_KEY").unwrap_or_else(fn() { "" })
+  let api_key = read_dotenv("LLM_API_KEY").unwrap_or_else(fn() {
+    @env.get_env_var("LLM_API_KEY").unwrap_or_else(fn() { "" })
   })
   let client = Client::new(
     provider_name="stepfun",
@@ -35,8 +35,8 @@ async test "LLM Tool Call" {
     .build()
   @sdk.set_tracer_provider(provider)
 
-  let api_key = read_dotenv("STEPFUN_API_KEY").unwrap_or_else(fn() {
-    @env.get_env_var("STEPFUN_API_KEY").unwrap_or_else(fn() { "" })
+  let api_key = read_dotenv("LLM_API_KEY").unwrap_or_else(fn() {
+    @env.get_env_var("LLM_API_KEY").unwrap_or_else(fn() { "" })
   })
   let client = Client::new(
     provider_name="stepfun",

@@ -49,6 +49,8 @@ pub struct LLMResponse {
   content : String?
   tool_calls : Array[ToolCall]
   finish_reason : String
+  response_id : String?
+  response_model : String?
 } derive(Debug)
 
 ///| A client for a GenAI provider.
@@ -114,7 +116,10 @@ fn get_llm_tracer() -> @trace.Tracer {
 /// - `gen_ai.request.max_tokens` = max_tokens
 /// - `gen_ai.usage.input_tokens` (from response)
 /// - `gen_ai.usage.output_tokens` (from response)
+/// - `gen_ai.response.id` (from response)
+/// - `gen_ai.response.model` (from response)
 /// - `gen_ai.response.finish_reasons` (from response)
+/// - `gen_ai.input.messages` and `gen_ai.output.messages` when `capture_content` is enabled
 pub async fn Client::chat(
   self : Client,
   messages : Array[Message],
@@ -132,27 +137,12 @@ pub async fn Client::chat(
     ])
   let span = tracer.build(builder)
 
-  // Record tool count if tools are present
-  if !tools.is_empty() {
-    span.set_attribute(
-      @otel.KeyValue::new("gen_ai.request.tool_count", Int64(tools.length().to_int64())),
-    )
-  }
-
-  // Capture user messages as events when enabled
+  // Capture input messages as span attribute when enabled
   if self.capture_content {
-    for i = 0; i < messages.length(); i = i + 1 {
-      let msg = messages[i]
-      if msg.role == "user" {
-        match msg.content {
-          Some(text) => span.add_event("gen_ai.user.message", attributes=[
-            @otel.KeyValue::new("message.index", Int64(i.to_int64())),
-            @otel.KeyValue::new("message.content", String(text)),
-          ])
-          None => ()
-        }
-      }
-    }
+    let input_messages = messages_to_json_array(messages)
+    span.set_attribute(
+      @otel.KeyValue::new("gen_ai.input.messages", String(input_messages.stringify())),
+    )
   }
 
   let body_json = build_request_json(messages, tools, self.model, self.max_tokens)
@@ -203,31 +193,31 @@ pub async fn Client::chat(
     None => ()
   }
 
-  // Record finish reason
+  // Record response metadata
   if llm_resp.finish_reason != "" {
     span.set_attribute(
       @otel.KeyValue::new(@semtrace.GEN_AI_RESPONSE_FINISH_REASONS, String(llm_resp.finish_reason)),
     )
   }
-
-  // Record tool calls as events
-  if !llm_resp.tool_calls.is_empty() {
-    for call in llm_resp.tool_calls {
-      span.add_event("gen_ai.tool.call", attributes=[
-        @otel.KeyValue::new(@semtrace.GEN_AI_TOOL_CALL_ID, String(call.id)),
-        @otel.KeyValue::new(@semtrace.GEN_AI_TOOL_NAME, String(call.name)),
-      ])
-    }
+  match llm_resp.response_id {
+    Some(id) => span.set_attribute(
+      @otel.KeyValue::new(@semtrace.GEN_AI_RESPONSE_ID, String(id)),
+    )
+    None => ()
+  }
+  match llm_resp.response_model {
+    Some(m) => span.set_attribute(
+      @otel.KeyValue::new(@semtrace.GEN_AI_RESPONSE_MODEL, String(m)),
+    )
+    None => ()
   }
 
-  // Capture assistant response content when enabled
+  // Record output messages as span attribute when enabled
   if self.capture_content {
-    match llm_resp.content {
-      Some(text) => span.add_event("gen_ai.assistant.message", attributes=[
-        @otel.KeyValue::new("message.content", String(text)),
-      ])
-      None => ()
-    }
+    let output_messages = output_messages_to_json_array(llm_resp)
+    span.set_attribute(
+      @otel.KeyValue::new("gen_ai.output.messages", String(output_messages.stringify())),
+    )
   }
 
   span.set_status(@trace.Status::ok())
@@ -310,7 +300,7 @@ fn parse_llm_response(data : Json) -> LLMResponse {
     ]),
     ..
   } else {
-    return { content: None, tool_calls: [], finish_reason: "" }
+    return { content: None, tool_calls: [], finish_reason: "", response_id: None, response_model: None }
   }
 
   // Extract content
@@ -337,5 +327,49 @@ fn parse_llm_response(data : Json) -> LLMResponse {
     []
   }
 
-  { content, tool_calls, finish_reason }
+  // Extract response-level metadata
+  let response_id = if data is { "id": String(id), .. } {
+    Some(id)
+  } else {
+    None
+  }
+  let response_model = if data is { "model": String(m), .. } {
+    Some(m)
+  } else {
+    None
+  }
+
+  { content, tool_calls, finish_reason, response_id, response_model }
+}
+
+///| Convert conversation messages to the GenAI input.messages JSON schema.
+///
+/// Schema: [{ "role": string, "content": string }]
+fn messages_to_json_array(messages : Array[Message]) -> Json {
+  let arr = messages.map(fn(msg) {
+    let obj : Map[String, Json] = {}
+    obj["role"] = msg.role.to_json()
+    match msg.content {
+      Some(text) => obj["content"] = text.to_json()
+      None => obj["content"] = Json::null()
+    }
+    Json::object(obj)
+  })
+  arr.to_json()
+}
+
+///| Convert an LLM response to the GenAI output.messages JSON schema.
+///
+/// Schema: [{ "role": "assistant", "content": string?, "tool_calls": [...]? }]
+fn output_messages_to_json_array(response : LLMResponse) -> Json {
+  let obj : Map[String, Json] = {}
+  obj["role"] = "assistant".to_json()
+  match response.content {
+    Some(text) => obj["content"] = text.to_json()
+    None => obj["content"] = Json::null()
+  }
+  if !response.tool_calls.is_empty() {
+    obj["tool_calls"] = response.tool_calls.map(fn(c) { c.to_json() }).to_json()
+  }
+  [Json::object(obj)].to_json()
 }
