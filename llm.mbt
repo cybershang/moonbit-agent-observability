@@ -57,19 +57,22 @@ pub struct LLMResponse {
 ///| Send a single request to the LLM with optional tools.
 pub async fn llm_request(
   messages : Array[Message],
-  api_key : String,
   tools~ : Array[Tool] = [],
   model_name~ : String = "step-3.7-flash",
   max_tokens~ : Int = 1024,
 ) -> LLMResponse {
+  let api_key = read_dotenv("STEPFUN_API_KEY").unwrap_or_else(fn() {
+    @env.get_env_var("STEPFUN_API_KEY").unwrap_or_else(fn() { "" })
+  })
   let body_json = build_request_json(messages, tools, model_name, max_tokens)
+  let headers = {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer " + api_key,
+  }
   let (response, resp_body) = @http.post(
     "https://api.stepfun.com/v1/chat/completions",
     body_json,
-    headers={
-      "Content-Type": "application/json",
-      "Authorization": "Bearer " + api_key,
-    },
+    headers~,
   )
   guard response.code == 200 else {
     abort("LLM request failed with status: \{response.code}")
@@ -181,4 +184,24 @@ fn parse_llm_response(data : Json) -> LLMResponse {
   }
 
   { content, tool_calls, finish_reason }
+}
+
+///| Read a `.env` file and look up a key.
+async fn read_dotenv(key : String) -> String? {
+  let content = try {
+    (@fs.read_file(".env").text() : String)
+  } catch {
+    _ => return None
+  }
+  for line in content.split("\n") {
+    let trimmed = line.trim(char_set="\r ")
+    if trimmed.is_empty() || trimmed.has_prefix("#") {
+      continue
+    }
+    match trimmed.split_once("=") {
+      Some((k, v)) => if k == key { return Some(v.to_owned()) }
+      None => continue
+    }
+  }
+  None
 }
