@@ -1,0 +1,11 @@
+# Environment variables
+.env
+
+# Build outputs
+_build/
+
+# Dependency cache
+.mooncakes/
+
+# IDE / editor
+.reasonix/
