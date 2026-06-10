@@ -3,9 +3,20 @@
 基于 MoonBit 实现的精简 AI Agent，演示 Agent 核心运行链路的 OpenTelemetry 可观测性插桩。
 
 ## 演示Demo
-- 实现了基础的交互和LLM插桩:https://www.bilibili.com/video/BV1n4EZ61EmU
+### 实现了基础的交互和LLM插桩
+视频：https://www.bilibili.com/video/BV1n4EZ61EmU
 
-## 架构
+Agent基础交互，包含多轮对话和工具调用:
+<img src="https://img.yingjie.dev/file/yingjie-blog/WindowsTerminal_BsUDSmrWHe_1781130355777_38jqds.avif"/>
+
+使用OTEL_STDOUT开启遥测信号回显：
+<img src="https://img.yingjie.dev/file/yingjie-blog/WindowsTerminal_nJ6LiuPjdN_1781130454369_0k4jcv.avif"/>
+
+使用CAPTURE_CONTENT开启对用户输入和LLM响应的采集：
+<img src="https://img.yingjie.dev/file/yingjie-blog/WindowsTerminal_6gHMJ2j9Fm_1781130539691_rc140m.avif"/>
+
+
+## Agent架构
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
