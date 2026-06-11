@@ -124,17 +124,38 @@ moon test
 
 ## Agent Observability
 
-当前项目已实现针对 **LLM Proxy（`Client::chat`）** 的 OpenTelemetry 插桩，覆盖以下 GenAI 语义约定：
+当前项目已实现 **Agent 全链路**的 OpenTelemetry 插桩，Trace 结构如下：
 
-- **Span**：`gen_ai.chat`
-  - `gen_ai.operation.name` = `chat`
-  - `gen_ai.provider.name` = 配置的提供商名称
-  - `gen_ai.request.model` = 当前请求模型
-  - `gen_ai.request.max_tokens` = 最大 token 数
-  - `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` = 用量（从响应解析）
-  - `gen_ai.response.id` / `gen_ai.response.model` = 响应元数据（从响应解析）
-  - `gen_ai.response.finish_reasons` = 响应结束原因
-  - `gen_ai.input.messages` / `gen_ai.output.messages`：当 `CAPTURE_CONTENT=true` 时以 JSON 字符串记录消息内容
+```
+agent.turn                    # Agent 编排层：一次完整的用户交互
+├── gen_ai.chat             # 第 1 轮 LLM 调用（返回 tool_calls）
+├── gen_ai.tool.execution   # 工具执行（如 get_weather）
+└── gen_ai.chat             # 第 2 轮 LLM 调用（返回最终回复）
+```
+
+### Span 详情
+
+**`agent.turn`**（Agent 编排层）
+- `agent.turn.input` = 用户输入
+- `agent.turn.max_tool_turns` = 最大允许轮数
+- `agent.turn.actual_turns` = 实际执行轮数
+- `agent.turn.tool_call_count` = 本 turn 执行的工具调用次数
+- `agent.turn.output` = 最终回复
+- 达到轮数上限时 `Status=Error`
+
+**`gen_ai.chat`**（LLM Proxy 层）
+- `gen_ai.operation.name` = `chat`
+- `gen_ai.provider.name` = 配置的提供商名称
+- `gen_ai.request.model` / `gen_ai.request.max_tokens`
+- `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens`
+- `gen_ai.response.id` / `gen_ai.response.model` / `gen_ai.response.finish_reasons`
+- `gen_ai.input.messages` / `gen_ai.output.messages`（当 `CAPTURE_CONTENT=true`）
+
+**`gen_ai.tool.execution`**（工具执行层）
+- `gen_ai.tool.name` = 工具名称
+- `gen_ai.tool.call.arguments` = 调用参数
+- `gen_ai.tool.call.result` = 执行结果
+- 未知工具或执行出错时 `Status=Error`
 
 通过设置 `OTEL_STDOUT=true` 可在 stdout 查看 trace 输出；设置 `CAPTURE_CONTENT=true` 可开启消息内容采集（默认关闭，避免敏感信息泄露）。
 
