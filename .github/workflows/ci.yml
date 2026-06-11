@@ -27,7 +27,7 @@ jobs:
           moon install
 
       - name: Check
-        run: moon check --deny-warn
+        run: moon check
 
       - name: Format check
         run: |

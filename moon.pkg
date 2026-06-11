@@ -1,5 +1,5 @@
 import {
-  "moonbitlang/async" @async,
+  "moonbitlang/async",
   "moonbitlang/async/http" @http,
   "moonbitlang/async/fs" @fs,
   "moonbitlang/async/process" @process,
@@ -13,7 +13,6 @@ import {
   "moonbit-community/opentelemetry/interface/trace" @trace,
   "moonbit-community/opentelemetry/sdk" @sdk,
   "moonbit-community/opentelemetry/sdk/trace" @sdktrace,
-  "moonbit-community/opentelemetry/sdk/error" @error,
   "moonbit-community/opentelemetry/print" @print,
   "moonbit-community/opentelemetry/semantics/trace" @semtrace,
 }
