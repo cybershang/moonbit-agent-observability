@@ -2,14 +2,15 @@
 
 本项目是一个基于 MoonBit 语言实现的 AI Agent，目标是对 Agent 的核心运行链路进行 OpenTelemetry 插桩，暴露可观测性数据（trace、span、event）。
 
-**当前状态**：早期实现阶段。设计文档（`agent_implementation_prompt.md`）规划了 4 个模块（DialogueEngine、LLMGateway、ToolRouter、TaskScheduler）和一套自研 OTel SDK。
+**当前状态**：早期实现阶段。设计文档（`agent_implementation_prompt.md`）规划了 4 个模块（DialogueEngine、LLMGateway、ToolRouter、TaskScheduler）。
 
 已实现：
 - `LLMGateway`（`llm.mbt`）：完整的 HTTP 调用、Tool Call 检测与解析、多轮对话消息累积。
 - `ToolRouter`（`tools.mbt`）：工具注册与执行框架，含 `get_weather`（mock）和 `execute_command`（安全受限的系统命令执行）两个工具。
 - `DialogueEngine`（`cmd/main/main.mbt`）：REPL 主循环支持连续对话上下文和自动 Tool Call 闭环。
+- OpenTelemetry 插桩（`agent.mbt`、`telemetry.mbt`）：基于 `moonbit-community/opentelemetry` 对 Agent 运行链路进行 trace/span 埋点，支持 OTLP/HTTP 导出到本地 Collector 或任意可配置端点。
 
-尚未实现：OpenTelemetry 插桩、TaskScheduler。
+尚未实现：TaskScheduler。
 
 ## 技术栈
 
@@ -20,23 +21,28 @@
 | 运行时 | `moonbitlang/async` — 原生异步运行时（协程、事件循环、HTTP、FS） |
 | 构建目标 | Native（`moon.mod` 中 `preferred_target = "native"`） |
 | LLM 提供商 | StepFun API (`api.stepfun.com/v1/chat/completions`) |
-| 可观测性 | 规划中（OpenTelemetry），尚未实现 |
+| 可观测性 | OpenTelemetry（基于 `moonbit-community/opentelemetry`，OTLP/HTTP 导出） |
 
 ## 项目结构
 
 ```
 agent-observability/
 ├── moon.mod                    # MoonBit 模块清单（模块名、版本、依赖）
-├── moon.pkg                    # 根包配置（llm.mbt / tools.mbt 的导入声明）
+├── moon.pkg                    # 根包配置（llm.mbt / tools.mbt 等的导入声明）
+├── agent.mbt                   # Agent 核心：对话轮次、工具调用闭环、OpenTelemetry 埋点
 ├── llm.mbt                     # 核心库：LLMGateway（Tool、Message、ToolCall、LLMResponse、llm_request）
 ├── tools.mbt                   # 核心库：ToolRouter（工具定义、execute_tool、安全命令执行）
+├── settings.mbt                # 应用配置（Settings、环境变量 / .env 读取）
+├── telemetry.mbt               # OpenTelemetry 初始化（init_telemetry：resource、exporter、provider）
+├── llm_test.mbt                # 异步测试
 ├── cmd/
 │   └── main/
 │       ├── moon.pkg            # 可执行包配置（is-main: true）
-│       └── main.mbt            # 入口：REPL 主循环 + 异步测试
+│       ├── main.mbt            # 入口：REPL 主循环
+│       └── otel_id_generator.mbt  # 进程唯一的随机 Trace/Span ID 生成器
 ├── agent_implementation_prompt.md  # 设计规格说明书（中文）
-├── README.md                   # 项目标题（当前仅一行）
-├── .env                        # 环境变量（STEPFUN_API_KEY）
+├── README.md                   # 项目说明
+├── .env                        # 环境变量（LLM_API_KEY、OTEL_EXPORTER_OTLP_ENDPOINT 等）
 └── .mooncakes/                 # moon 下载的外部依赖缓存
 ```
 
@@ -62,10 +68,13 @@ moon test
 ### 运行
 
 ```bash
-# 需要设置 STEPFUN_API_KEY
-export STEPFUN_API_KEY=your_key_here
+# 需要设置 LLM_API_KEY
+export LLM_API_KEY=your_key_here
 # 或者写入 .env 文件
-echo "STEPFUN_API_KEY=your_key_here" > .env
+cat > .env <<EOF
+LLM_API_KEY=your_key_here
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+EOF
 
 # 运行 REPL
 moon run cmd/main
@@ -76,7 +85,8 @@ moon run cmd/main
 - 使用 `moonbitlang/async` 提供的异步原语（`async fn`、 `@http`、 `@fs`、 `@process`）。
 - 优先使用结构化类型（`struct Message`、`struct ToolCall`）而非裸 JSON，便于后续插桩。
 - 工具执行安全：execute_command 拒绝 rm / mv / cp 等危险命令。
-- API Key 读取优先级：`.env` 文件 > 环境变量。
+- 环境变量读取优先级：进程环境变量 > `.env` 文件 > 默认值。
+- OTLP 端点可通过 `OTEL_EXPORTER_OTLP_ENDPOINT` 配置，默认 `http://localhost:4318`。
 
 ## 已知编译器警告
 

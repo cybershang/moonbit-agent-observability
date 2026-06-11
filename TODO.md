@@ -4,39 +4,23 @@
 
 ---
 
-## 🔴 提交前必须处理
-
-### 1. 修复 `moon.mod` 中的 license 字段与 LICENSE 文件不一致
-- **状态**：✅ 已完成 — 已将 `moon.mod` 中 `license` 从 `"Apache-2.0"` 改为 `"MulanPSL-2.0"`，与 LICENSE 文件一致。
-
----
-
 ## 🟡 提交前建议处理
 
-### 2. 清理 `moon.pkg` 中未使用的包导入
+### 1. 清理 `moon.pkg` 中未使用的包导入
 - **状态**：⚠️ 无法修复（MoonBit 编译器限制）
 - **原因**：`llm_test.mbt` 与源码共享同一个 `moon.pkg`（MoonBit 不支持文件级 import 或独立测试子包），测试中使用的 `@sdk`、`@print`、`@stdio` 必须保留在根包导入中。实际验证：删除这 3 个包后 `moon check` 报 8 个编译错误。
 - **现状**：4 条 `unused_package` 警告（`moonbitlang/async`、`stdio`、`sdk`、`print`），功能无影响，CI 已移除 `--deny-warn`。
-
-### 3. 清理 `cmd/main/moon.pkg` 中未使用的 alias
-- **状态**：✅ 无需处理 — `cmd/main/moon.pkg` 中 `"moonbitlang/async"` 无 alias，且 `async fn main` 关键字依赖此包，不属于 unused import。
 
 ---
 
 ## 🟢 建议改进（提升项目质量和评审印象）
 
-### 4. 增加 GitHub Actions CI 配置
-- **状态**：✅ 已完成 — `.github/workflows/ci.yml` 已存在，包含 `moon check`、`moon fmt`、`moon info`、`moon test`。
-
-### 5. 增加非交互式 runnable example
+### 2. 增加非交互式 runnable example
 - **现状**：目前只有 `cmd/main` 一个 REPL 入口，需要人工交互
 - **建议**：增加一个非交互式示例（如单次对话 + tool call 的演示），方便评审快速体验核心功能
 - **可选**：也可以将 REPL 的某次典型对话输出截图放入 README
 
-### 6. 统一 README 中的许可证声明
-- **状态**：✅ 已完成 — `moon.mod` license 已修正为 `MulanPSL-2.0`，与 README 和 LICENSE 文件一致。
-
-### 7. 考虑扩展源码规模或明确项目定位
+### 3. 考虑扩展源码规模或明确项目定位
 - **现状**：约 971 行 MoonBit 源码（7 个 `.mbt` 文件）
 - **参考**：章程给出的项目规模参考为 **4~10k 有效 MoonBit 代码行**
 - **建议**：
@@ -65,4 +49,5 @@
 | LICENSE 文件 | ✅ Mulan PSL v2 |
 | README 文档 | ✅ 较完整 |
 | 远程仓库 | ✅ 已有 Gitlink + GitHub 双远程 |
+| OTLP 端点可配置 | ✅ 默认 `http://localhost:4318`，支持 `.env` 覆盖 |
 | 源码规模 | ⚠️ ~971 行，7 个 `.mbt` 文件 |
