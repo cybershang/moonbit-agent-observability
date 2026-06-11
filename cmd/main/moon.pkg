@@ -1,8 +1,10 @@
 import {
   "yingjie/agent-observability" @agent,
   "moonbitlang/async" @async,
+  "moonbitlang/async/process" @process,
   "moonbitlang/async/stdio" @stdio,
   "moonbitlang/core/env" @env,
+  "moonbitlang/core/random" @random,
   "moonbit-community/opentelemetry/interface/common" @common,
   "moonbit-community/opentelemetry/sdk" @sdk,
   "moonbit-community/opentelemetry/sdk/resource" @resource,
