@@ -160,7 +160,19 @@ docker compose up -d
 OTEL_STDOUT=false moon run cmd/main
 ```
 
-发送一条消息后，打开 http://localhost:16686 即可在 Jaeger 中查看 `gen_ai.chat` span 及完整属性。
+发送一条消息后，打开 http://localhost:16686 即可在 Jaeger 中查看 `gen_ai.chat` span 及完整属性。Service 名称为 `agent-observability`（可通过 `OTEL_SERVICE_NAME` 环境变量覆盖）。
+
+Batch Span Processor 针对交互式 REPL 做了调优：
+- `max_queue_size=64`
+- `max_export_batch_size=16`
+- `scheduled_delay_millis=1000`
+- `export_timeout_millis=5000`
+
+这样 span 会在 1 秒内或累积 16 条时被批量发送，退出前还会显式 `force_flush()` + `shutdown()`，避免数据丢失。你也可以通过标准环境变量覆盖：
+- `OTEL_BSP_MAX_QUEUE_SIZE`
+- `OTEL_BSP_MAX_EXPORT_BATCH_SIZE`
+- `OTEL_BSP_SCHEDULE_DELAY`
+- `OTEL_BSP_EXPORT_TIMEOUT`
 
 Agent 编排层（`Agent::run`）与工具执行层的 trace 插桩尚未实现，后续计划补充：
 - Agent turn 级别的 span
