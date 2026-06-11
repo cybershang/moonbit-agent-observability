@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Yingjie Shang
 // agent-observability is licensed under Mulan PSL v2.
 
+///|
 async fn main {
   let settings = @agent.Settings::from_env()
 
@@ -11,11 +12,12 @@ async fn main {
     let base = @resource.Resource::builder().build()
     match @env.get_env_var("OTEL_SERVICE_NAME") {
       Some(_) => base
-      None => base.merge(
-        @resource.Resource::new([
-          @common.KeyValue::new("service.name", String("agent-observability")),
-        ]),
-      )
+      None =>
+        base.merge(
+          @resource.Resource::new([
+            @common.KeyValue::new("service.name", String("agent-observability")),
+          ]),
+        )
     }
   }
 
@@ -36,32 +38,30 @@ async fn main {
   let provider = if settings.otel_stdout {
     let exporter = @print.SpanExporter::new()
     @sdk.tracer_provider_builder()
-      .with_resource(resource)
-      .with_id_generator(id_generator)
-      .with_simple_exporter(exporter.into_span_exporter())
-      .build()
+    .with_resource(resource)
+    .with_id_generator(id_generator)
+    .with_simple_exporter(exporter.into_span_exporter())
+    .build()
   } else {
     match @otlp.SpanExporter::builder().with_http().build() {
       Ok(exporter) =>
         @sdk.tracer_provider_builder()
-          .with_resource(resource)
-          .with_id_generator(id_generator)
-          .with_batch_exporter(
-            exporter.into_span_exporter(),
-            config=batch_config,
-          )
-          .build()
+        .with_resource(resource)
+        .with_id_generator(id_generator)
+        .with_batch_exporter(exporter.into_span_exporter(), config=batch_config)
+        .build()
       Err(err) => {
         let err_text = match err {
           InvalidConfig(key, msg) => "InvalidConfig(\{key}, \{msg})"
           UnsupportedProtocol(p) => "UnsupportedProtocol(\{p})"
-          UnsupportedCompressionAlgorithm(a) => "UnsupportedCompressionAlgorithm(\{a})"
+          UnsupportedCompressionAlgorithm(a) =>
+            "UnsupportedCompressionAlgorithm(\{a})"
         }
         @stdio.stdout.write("Failed to build OTLP exporter: " + err_text + "\n")
         @sdk.tracer_provider_builder()
-          .with_resource(resource)
-          .with_id_generator(id_generator)
-          .build()
+        .with_resource(resource)
+        .with_id_generator(id_generator)
+        .build()
       }
     }
   }
@@ -93,7 +93,13 @@ async fn main {
 
     let turn = agent.run(prompt)
     for record in turn.tool_calls {
-      @stdio.stdout.write("\n[Tool Call] " + record.call.name + "(" + record.call.arguments + ")\n")
+      @stdio.stdout.write(
+        "\n[Tool Call] " +
+        record.call.name +
+        "(" +
+        record.call.arguments +
+        ")\n",
+      )
       let display_result = if record.result.length() > 200 {
         record.result[:200].to_owned() + "... (truncated)"
       } else {

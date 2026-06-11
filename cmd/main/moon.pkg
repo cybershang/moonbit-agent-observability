@@ -1,16 +1,16 @@
 import {
   "yingjie/agent-observability" @agent,
-  "moonbitlang/async" @async,
-  "moonbitlang/async/process" @process,
-  "moonbitlang/async/stdio" @stdio,
-  "moonbitlang/core/env" @env,
-  "moonbitlang/core/random" @random,
-  "moonbit-community/opentelemetry/interface/common" @common,
-  "moonbit-community/opentelemetry/sdk" @sdk,
-  "moonbit-community/opentelemetry/sdk/resource" @resource,
+  "moonbitlang/async",
+  "moonbitlang/async/process",
+  "moonbitlang/async/stdio",
+  "moonbitlang/core/env",
+  "moonbitlang/core/random",
+  "moonbit-community/opentelemetry/interface/common",
+  "moonbit-community/opentelemetry/sdk",
+  "moonbit-community/opentelemetry/sdk/resource",
   "moonbit-community/opentelemetry/sdk/trace" @sdktrace,
-  "moonbit-community/opentelemetry/otlp" @otlp,
-  "moonbit-community/opentelemetry/print" @print,
+  "moonbit-community/opentelemetry/otlp",
+  "moonbit-community/opentelemetry/print",
 }
 
 options(

@@ -47,7 +47,7 @@ async test "LLM Tool Call" {
 
   // Round 1: User asks about Beijing weather
   let messages = [Message::new(content=Some("北京今天天气怎么样？"))]
-  let response1 = client.chat(messages, tools=tools)
+  let response1 = client.chat(messages, tools~)
   @debug.debug(response1)
 
   // If LLM requests tool calls, execute them and continue
@@ -71,7 +71,7 @@ async test "LLM Tool Call" {
     }
 
     // Round 2: Send tool results back to LLM
-    let response2 = client.chat(messages, tools=tools)
+    let response2 = client.chat(messages, tools~)
     @debug.debug(response2)
     match response2.content {
       Some(content) => @stdio.stdout.write(content + "\n")

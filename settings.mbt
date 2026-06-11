@@ -1,7 +1,8 @@
 // Copyright (c) 2026 Yingjie Shang
 // agent-observability is licensed under Mulan PSL v2.
 
-///| Application settings loaded from environment variables or `.env` file.
+///|
+/// Application settings loaded from environment variables or `.env` file.
 pub struct Settings {
   // LLM provider
   provider_name : String
@@ -16,7 +17,8 @@ pub struct Settings {
   capture_content : Bool
 }
 
-///| Load settings from environment variables or `.env` file.
+///|
+/// Load settings from environment variables or `.env` file.
 pub async fn Settings::from_env() -> Settings {
   let api_key = env("LLM_API_KEY")
   let provider_name = env("LLM_PROVIDER", default="stepfun")
@@ -38,11 +40,10 @@ pub async fn Settings::from_env() -> Settings {
   }
 }
 
-///| Read a `.env` file and look up a key.
+///|
+/// Read a `.env` file and look up a key.
 pub async fn read_dotenv(key : String) -> String? {
-  let content = try {
-    (@fs.read_file(".env").text() : String)
-  } catch {
+  let content = (@fs.read_file(".env").text() : String) catch {
     _ => return None
   }
   for line in content.split("\n") {
@@ -58,25 +59,22 @@ pub async fn read_dotenv(key : String) -> String? {
   None
 }
 
-///| Read a configuration value from the process environment or `.env` file.
+///|
+/// Read a configuration value from the process environment or `.env` file.
 ///
 /// Resolution order: process environment > `.env` file > default.
-pub async fn env(key : String, default~ : String = "") -> String {
+pub async fn env(key : String, default? : String = "") -> String {
   match @env.get_env_var(key) {
     Some(value) => value
     None => read_dotenv(key).unwrap_or(default)
   }
 }
 
-///| Parse an integer from a string, returning the default on failure.
+///|
+/// Parse an integer from a string, returning the default on failure.
 pub fn parse_int(s : String, default : Int) -> Int {
   match s.trim() {
     "" => default
-    text =>
-      try {
-        @string.parse_int(text)
-      } catch {
-        _ => default
-      }
+    text => @string.parse_int(text) catch { _ => default }
   }
 }
