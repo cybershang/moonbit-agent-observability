@@ -21,8 +21,23 @@ jobs:
       - name: MoonBit version
         run: moon version --all
 
+      - name: Install dependencies
+        run: |
+          moon update
+          moon install
+
       - name: Check
-        run: moon check
+        run: moon check --deny-warn
+
+      - name: Format check
+        run: |
+          moon fmt
+          git diff --exit-code
+
+      - name: Info check
+        run: |
+          moon info
+          git diff --exit-code
 
       - name: Test
         run: moon test
