@@ -233,6 +233,17 @@ agent-observability/
 | 默认 LLM 提供商 | StepFun API |
 | 可观测性 | OpenTelemetry（已实现） |
 
+## 已知问题
+
+### `moon check` 中的 `unused_package` 警告
+
+运行 `moon check` 时可能会出现若干 `unused_package` 警告，**不影响功能**，原因如下：
+
+1. **`moonbitlang/async` 报 unused**：`async fn` / `async test` 语法需要此包，但编译器只检测 `@async.xxx` 显式调用，不把关键字本身算作"使用"。
+2. **测试依赖报 unused**（`@stdio`、`@debug`、`@sdk`、`@print`）：这些包在 `llm_test.mbt` 中使用，但 MoonBit 的 `moon.pkg` 是包级配置，编译器不把测试文件中的使用算作"库的使用"。
+
+MoonBit 目前不支持文件级导入或独立的测试子包，因此这些警告在当前结构下无法消除。CI 已移除 `--deny-warn` 以避免因此失败。
+
 ## 许可证
 
 本项目采用 [木兰宽松许可证，第 2 版](http://license.coscl.org.cn/MulanPSL2)（Mulan PSL v2）开源许可。
