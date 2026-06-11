@@ -43,7 +43,7 @@ pub fn Message::new(
 
 ///|
 /// A tool call requested by the LLM.
-pub struct ToolCall {
+pub(all) struct ToolCall {
   id : String
   name : String
   arguments : String
@@ -51,7 +51,7 @@ pub struct ToolCall {
 
 ///|
 /// Result of a single LLM request.
-pub struct LLMResponse {
+pub(all) struct LLMResponse {
   content : String?
   tool_calls : Array[ToolCall]
   finish_reason : String
