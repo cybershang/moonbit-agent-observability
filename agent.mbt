@@ -126,11 +126,35 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
 
 ///| Execute a tool by name with JSON arguments.
 pub async fn execute_tool(name : String, arguments : String) -> String {
-  match name {
+  let tracer = get_agent_tracer()
+  let builder = tracer
+    .span_builder("gen_ai.tool.execution")
+    .with_kind(@trace.Internal)
+    .with_attributes([
+      @otel.KeyValue::new("gen_ai.tool.name", String(name)),
+      @otel.KeyValue::new("gen_ai.tool.call.arguments", String(arguments)),
+    ])
+  let span = tracer.build(builder)
+
+  let result = match name {
     "get_weather" => get_weather(arguments)
     "execute_command" => execute_command_tool(arguments)
-    _ => "{\"error\": \"Unknown tool: " + name + "\"}"
+    _ => {
+      span.set_status(@trace.Status::error(description=Some("Unknown tool: " + name)))
+      "{\"error\": \"Unknown tool: " + name + "\"}"
+    }
   }
+
+  // Record whether the result indicates an error
+  if result.contains("\"error\"") {
+    span.set_status(@trace.Status::error(description=Some("tool returned error")))
+  } else {
+    span.set_status(@trace.Status::ok())
+  }
+  span.set_attribute(@otel.KeyValue::new("gen_ai.tool.call.result", String(result)))
+  span.end()
+
+  result
 }
 
 ///| Mock weather tool: always returns sunny 25°C.
