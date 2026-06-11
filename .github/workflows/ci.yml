@@ -39,5 +39,17 @@ jobs:
           moon info
           git diff --exit-code
 
+      - name: Check LLM_API_KEY secret
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: |
+          if [ -z "$LLM_API_KEY" ]; then
+            echo "::error::LLM_API_KEY secret is not configured. Go to Settings → Secrets and variables → Actions → add LLM_API_KEY."
+            exit 1
+          fi
+          echo "LLM_API_KEY is set ✓"
+
       - name: Test
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
         run: moon test
