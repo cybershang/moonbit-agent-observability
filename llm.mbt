@@ -3,14 +3,16 @@
 
 ///| Types
 
-///| A tool definition that can be registered with the LLM.
+///|
+/// A tool definition that can be registered with the LLM.
 pub struct Tool {
   name : String
   description : String
   parameters : Json
 } derive(Debug)
 
-///| Create a new tool definition.
+///|
+/// Create a new tool definition.
 pub fn Tool::new(
   name~ : String,
   description~ : String,
@@ -19,7 +21,8 @@ pub fn Tool::new(
   { name, description, parameters }
 }
 
-///| A single message in the conversation history.
+///|
+/// A single message in the conversation history.
 pub struct Message {
   role : String
   content : String?
@@ -27,24 +30,27 @@ pub struct Message {
   tool_call_id : String?
 } derive(Debug)
 
-///| Create a new message.
+///|
+/// Create a new message.
 pub fn Message::new(
-  role~ : String = "user",
-  content~ : String? = None,
-  tool_calls~ : Array[ToolCall]? = None,
-  tool_call_id~ : String? = None,
+  role? : String = "user",
+  content? : String? = None,
+  tool_calls? : Array[ToolCall]? = None,
+  tool_call_id? : String? = None,
 ) -> Message {
   { role, content, tool_calls, tool_call_id }
 }
 
-///| A tool call requested by the LLM.
+///|
+/// A tool call requested by the LLM.
 pub struct ToolCall {
   id : String
   name : String
   arguments : String
 } derive(Debug)
 
-///| Result of a single LLM request.
+///|
+/// Result of a single LLM request.
 pub struct LLMResponse {
   content : String?
   tool_calls : Array[ToolCall]
@@ -53,7 +59,8 @@ pub struct LLMResponse {
   response_model : String?
 } derive(Debug)
 
-///| A client for a GenAI provider.
+///|
+/// A client for a GenAI provider.
 pub struct Client {
   provider_name : String
   base_url : String
@@ -63,19 +70,21 @@ pub struct Client {
   capture_content : Bool
 }
 
-///| Create a new GenAI client.
+///|
+/// Create a new GenAI client.
 pub fn Client::new(
   provider_name~ : String,
   base_url~ : String,
   model~ : String,
   api_key~ : String,
-  max_tokens~ : Int = 1024,
-  capture_content~ : Bool = false,
+  max_tokens? : Int = 1024,
+  capture_content? : Bool = false,
 ) -> Client {
   { provider_name, base_url, model, api_key, max_tokens, capture_content }
 }
 
-///| Create a client from a loaded `Settings` value.
+///|
+/// Create a client from a loaded `Settings` value.
 pub fn Client::from_settings(settings : Settings) -> Client {
   Client::new(
     provider_name=settings.provider_name,
@@ -89,15 +98,20 @@ pub fn Client::from_settings(settings : Settings) -> Client {
 
 ///| OpenTelemetry tracer
 
-///| Lazily-initialized tracer for the LLMGateway module.
+///|
+/// Lazily-initialized tracer for the LLMGateway module.
 let llm_tracer : Ref[@trace.Tracer?] = Ref(None)
 
-///| Get or create the LLMGateway tracer.
+///|
+/// Get or create the LLMGateway tracer.
 fn get_llm_tracer() -> @trace.Tracer {
   match llm_tracer.val {
     Some(t) => t
     None => {
-      let t = @otel.tracer("yingjie/agent-observability/llm", version=Some("0.1.0"))
+      let t = @otel.tracer(
+        "yingjie/agent-observability/llm",
+        version=Some("0.1.0"),
+      )
       llm_tracer.val = Some(t)
       t
     }
@@ -106,7 +120,8 @@ fn get_llm_tracer() -> @trace.Tracer {
 
 ///| Public API
 
-///| Send a chat request to the configured GenAI provider.
+///|
+/// Send a chat request to the configured GenAI provider.
 ///
 /// This method is instrumented with OpenTelemetry GenAI semantic conventions:
 /// - Span name: `gen_ai.chat`
@@ -123,8 +138,8 @@ fn get_llm_tracer() -> @trace.Tracer {
 pub async fn Client::chat(
   self : Client,
   messages : Array[Message],
-  tools~ : Array[Tool] = [],
-  parent_context~ : @context.Context = @context.Context::empty(),
+  tools? : Array[Tool] = [],
+  parent_context? : @context.Context = @context.Context::empty(),
 ) -> LLMResponse {
   let tracer = get_llm_tracer()
   let builder = tracer
@@ -134,7 +149,10 @@ pub async fn Client::chat(
       @otel.KeyValue::new(@semtrace.GEN_AI_OPERATION_NAME, String("chat")),
       @otel.KeyValue::new("gen_ai.provider.name", String(self.provider_name)),
       @otel.KeyValue::new(@semtrace.GEN_AI_REQUEST_MODEL, String(self.model)),
-      @otel.KeyValue::new(@semtrace.GEN_AI_REQUEST_MAX_TOKENS, Int64(self.max_tokens.to_int64())),
+      @otel.KeyValue::new(
+        @semtrace.GEN_AI_REQUEST_MAX_TOKENS,
+        Int64(self.max_tokens.to_int64()),
+      ),
     ])
   let span = tracer.build_with_context(builder, parent_context)
 
@@ -142,11 +160,19 @@ pub async fn Client::chat(
   if self.capture_content {
     let input_messages = messages_to_json_array(messages)
     span.set_attribute(
-      @otel.KeyValue::new("gen_ai.input.messages", String(input_messages.stringify())),
+      @otel.KeyValue::new(
+        "gen_ai.input.messages",
+        String(input_messages.stringify()),
+      ),
     )
   }
 
-  let body_json = build_request_json(messages, tools, self.model, self.max_tokens)
+  let body_json = build_request_json(
+    messages,
+    tools,
+    self.model,
+    self.max_tokens,
+  )
   let headers = {
     "Content-Type": "application/json",
     "Authorization": "Bearer " + self.api_key,
@@ -160,7 +186,9 @@ pub async fn Client::chat(
   )
 
   guard response.code == 200 else {
-    span.set_status(@trace.Status::error(description=Some("HTTP \{response.code}")))
+    span.set_status(
+      @trace.Status::error(description=Some("HTTP \{response.code}")),
+    )
     span.add_event("llm.http_error", attributes=[
       @otel.KeyValue::new("http.status_code", Int64(response.code.to_int64())),
     ])
@@ -182,12 +210,18 @@ pub async fn Client::chat(
     Some(u) => {
       if u is { "prompt_tokens": Number(pt, ..), .. } {
         span.set_attribute(
-          @otel.KeyValue::new(@semtrace.GEN_AI_USAGE_INPUT_TOKENS, Int64(pt.to_int64())),
+          @otel.KeyValue::new(
+            @semtrace.GEN_AI_USAGE_INPUT_TOKENS,
+            Int64(pt.to_int64()),
+          ),
         )
       }
       if u is { "completion_tokens": Number(ct, ..), .. } {
         span.set_attribute(
-          @otel.KeyValue::new(@semtrace.GEN_AI_USAGE_OUTPUT_TOKENS, Int64(ct.to_int64())),
+          @otel.KeyValue::new(
+            @semtrace.GEN_AI_USAGE_OUTPUT_TOKENS,
+            Int64(ct.to_int64()),
+          ),
         )
       }
     }
@@ -197,19 +231,24 @@ pub async fn Client::chat(
   // Record response metadata
   if llm_resp.finish_reason != "" {
     span.set_attribute(
-      @otel.KeyValue::new(@semtrace.GEN_AI_RESPONSE_FINISH_REASONS, String(llm_resp.finish_reason)),
+      @otel.KeyValue::new(
+        @semtrace.GEN_AI_RESPONSE_FINISH_REASONS,
+        String(llm_resp.finish_reason),
+      ),
     )
   }
   match llm_resp.response_id {
-    Some(id) => span.set_attribute(
-      @otel.KeyValue::new(@semtrace.GEN_AI_RESPONSE_ID, String(id)),
-    )
+    Some(id) =>
+      span.set_attribute(
+        @otel.KeyValue::new(@semtrace.GEN_AI_RESPONSE_ID, String(id)),
+      )
     None => ()
   }
   match llm_resp.response_model {
-    Some(m) => span.set_attribute(
-      @otel.KeyValue::new(@semtrace.GEN_AI_RESPONSE_MODEL, String(m)),
-    )
+    Some(m) =>
+      span.set_attribute(
+        @otel.KeyValue::new(@semtrace.GEN_AI_RESPONSE_MODEL, String(m)),
+      )
     None => ()
   }
 
@@ -217,7 +256,10 @@ pub async fn Client::chat(
   if self.capture_content {
     let output_messages = output_messages_to_json_array(llm_resp)
     span.set_attribute(
-      @otel.KeyValue::new("gen_ai.output.messages", String(output_messages.stringify())),
+      @otel.KeyValue::new(
+        "gen_ai.output.messages",
+        String(output_messages.stringify()),
+      ),
     )
   }
 
@@ -227,7 +269,8 @@ pub async fn Client::chat(
   llm_resp
 }
 
-///| Convert a `Message` to JSON for the API request.
+///|
+/// Convert a `Message` to JSON for the API request.
 pub fn Message::to_json(self : Message) -> Json {
   let obj : Map[String, Json] = {}
   obj["role"] = self.role.to_json()
@@ -236,7 +279,8 @@ pub fn Message::to_json(self : Message) -> Json {
     None => obj["content"] = Json::null()
   }
   match self.tool_calls {
-    Some(calls) => obj["tool_calls"] = calls.map(fn(c) { c.to_json() }).to_json()
+    Some(calls) =>
+      obj["tool_calls"] = calls.map(fn(c) { c.to_json() }).to_json()
     None => ()
   }
   match self.tool_call_id {
@@ -246,7 +290,8 @@ pub fn Message::to_json(self : Message) -> Json {
   Json::object(obj)
 }
 
-///| Convert a `ToolCall` to JSON.
+///|
+/// Convert a `ToolCall` to JSON.
 pub fn ToolCall::to_json(self : ToolCall) -> Json {
   let fn_obj : Map[String, Json] = {}
   fn_obj["name"] = self.name.to_json()
@@ -260,7 +305,8 @@ pub fn ToolCall::to_json(self : ToolCall) -> Json {
 
 ///| Internal helpers
 
-///| Build the request JSON body.
+///|
+/// Build the request JSON body.
 fn build_request_json(
   messages : Array[Message],
   tools : Array[Tool],
@@ -288,20 +334,23 @@ fn build_request_json(
   Json::object(body)
 }
 
-///| Parse the LLM JSON response into `LLMResponse`.
+///|
+/// Parse the LLM JSON response into `LLMResponse`.
 fn parse_llm_response(data : Json) -> LLMResponse {
-  guard data is {
-    "choices": Array([
-      {
-        "message": message,
-        "finish_reason": String(finish_reason),
-        ..
-      },
+  guard data
+    is {
+      "choices": Array(
+        [{ "message": message, "finish_reason": String(finish_reason), .. }, ..]
+      ),
       ..
-    ]),
-    ..
-  } else {
-    return { content: None, tool_calls: [], finish_reason: "", response_id: None, response_model: None }
+    } else {
+    return {
+      content: None,
+      tool_calls: [],
+      finish_reason: "",
+      response_id: None,
+      response_model: None,
+    }
   }
 
   // Extract content
@@ -313,13 +362,13 @@ fn parse_llm_response(data : Json) -> LLMResponse {
 
   // Extract tool_calls
   let tool_calls = if message is { "tool_calls": Array(calls), .. } {
-    calls
-    .filter_map(fn(call) {
-      guard call is {
-        "id": String(id),
-        "function": { "name": String(name), "arguments": String(args), .. },
-        ..
-      } else {
+    calls.filter_map(fn(call) {
+      guard call
+        is {
+          "id": String(id),
+          "function": { "name": String(name), "arguments": String(args), .. },
+          ..
+        } else {
         return None
       }
       Some({ id, name, arguments: args })
@@ -343,7 +392,8 @@ fn parse_llm_response(data : Json) -> LLMResponse {
   { content, tool_calls, finish_reason, response_id, response_model }
 }
 
-///| Convert conversation messages to the GenAI input.messages JSON schema.
+///|
+/// Convert conversation messages to the GenAI input.messages JSON schema.
 ///
 /// Schema: [{ "role": string, "content": string }]
 fn messages_to_json_array(messages : Array[Message]) -> Json {
@@ -359,7 +409,8 @@ fn messages_to_json_array(messages : Array[Message]) -> Json {
   arr.to_json()
 }
 
-///| Convert an LLM response to the GenAI output.messages JSON schema.
+///|
+/// Convert an LLM response to the GenAI output.messages JSON schema.
 ///
 /// Schema: [{ "role": "assistant", "content": string?, "tool_calls": [...]? }]
 fn output_messages_to_json_array(response : LLMResponse) -> Json {

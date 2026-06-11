@@ -1,22 +1,28 @@
 // Copyright (c) 2026 Yingjie Shang
 // agent-observability is licensed under Mulan PSL v2.
 
-///| OpenTelemetry tracer for the Agent module.
+///|
+/// OpenTelemetry tracer for the Agent module.
 let agent_tracer : Ref[@trace.Tracer?] = Ref(None)
 
-///| Get or create the Agent tracer.
+///|
+/// Get or create the Agent tracer.
 fn get_agent_tracer() -> @trace.Tracer {
   match agent_tracer.val {
     Some(t) => t
     None => {
-      let t = @otel.tracer("yingjie/agent-observability/agent", version=Some("0.1.0"))
+      let t = @otel.tracer(
+        "yingjie/agent-observability/agent",
+        version=Some("0.1.0"),
+      )
       agent_tracer.val = Some(t)
       t
     }
   }
 }
 
-///| An agent that orchestrates LLM chat with tool calls.
+///|
+/// An agent that orchestrates LLM chat with tool calls.
 ///
 /// The agent maintains conversation history and automatically executes
 /// any tool calls requested by the LLM, feeding results back until a
@@ -28,29 +34,33 @@ pub struct Agent {
   max_tool_turns : Int
 }
 
-///| Create a new agent with the given client and optional tools.
+///|
+/// Create a new agent with the given client and optional tools.
 pub fn Agent::new(
   client : Client,
-  tools~ : Array[Tool] = [],
-  max_tool_turns~ : Int = 10,
+  tools? : Array[Tool] = [],
+  max_tool_turns? : Int = 10,
 ) -> Agent {
   { client, messages: [], tools, max_tool_turns }
 }
 
-///| Record of a single tool call executed during an agent turn.
+///|
+/// Record of a single tool call executed during an agent turn.
 pub struct ToolCallRecord {
   call : ToolCall
   result : String
 } derive(Debug)
 
-///| Result of a single agent turn, including the assistant's reply
+///|
+/// Result of a single agent turn, including the assistant's reply
 /// and any tool calls that were executed.
 pub struct AgentTurnResult {
   reply : String
   tool_calls : Array[ToolCallRecord]
 } derive(Debug)
 
-///| Run one turn of conversation with the agent.
+///|
+/// Run one turn of conversation with the agent.
 ///
 /// The prompt is appended to the conversation history, then the agent
 /// loops over LLM responses and tool calls until a final text response
@@ -63,7 +73,10 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
     .with_kind(@trace.Internal)
     .with_attributes([
       @otel.KeyValue::new("agent.turn.input", String(prompt)),
-      @otel.KeyValue::new("agent.turn.max_tool_turns", Int64(self.max_tool_turns.to_int64())),
+      @otel.KeyValue::new(
+        "agent.turn.max_tool_turns",
+        Int64(self.max_tool_turns.to_int64()),
+      ),
     ])
   let span = tracer.build(builder)
   let parent_context = span.context()
@@ -79,23 +92,24 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
     let response = self.client.chat(
       self.messages,
       tools=self.tools,
-      parent_context=parent_context,
+      parent_context~,
     )
     if response.finish_reason == "tool_calls" {
       // Add assistant message with tool_calls
-      self.messages.push(Message::new(
-        role="assistant",
-        tool_calls=Some(response.tool_calls),
-      ))
+      self.messages.push(
+        Message::new(role="assistant", tool_calls=Some(response.tool_calls)),
+      )
       // Execute each tool call and add tool results
       for call in response.tool_calls {
-        let result = execute_tool(call.name, call.arguments, parent_context=parent_context)
+        let result = execute_tool(call.name, call.arguments, parent_context~)
         executed.push({ call, result })
-        self.messages.push(Message::new(
-          role="tool",
-          content=Some(result),
-          tool_call_id=Some(call.id),
-        ))
+        self.messages.push(
+          Message::new(
+            role="tool",
+            content=Some(result),
+            tool_call_id=Some(call.id),
+          ),
+        )
       }
       // Continue loop to send tool results back to LLM
     } else {
@@ -110,7 +124,9 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
   // If we hit the turn limit without a final reply, report it
   if has_tool_calls {
     final_reply = "[Agent reached maximum tool-call turns without producing a final reply.]"
-    span.set_status(@trace.Status::error(description=Some("max_tool_turns_reached")))
+    span.set_status(
+      @trace.Status::error(description=Some("max_tool_turns_reached")),
+    )
   } else {
     span.set_status(@trace.Status::ok())
   }
@@ -119,7 +135,10 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
     @otel.KeyValue::new("agent.turn.actual_turns", Int64(turn.to_int64())),
   )
   span.set_attribute(
-    @otel.KeyValue::new("agent.turn.tool_call_count", Int64(executed.length().to_int64())),
+    @otel.KeyValue::new(
+      "agent.turn.tool_call_count",
+      Int64(executed.length().to_int64()),
+    ),
   )
   span.set_attribute(
     @otel.KeyValue::new("agent.turn.output", String(final_reply)),
@@ -129,11 +148,12 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
   { reply: final_reply, tool_calls: executed }
 }
 
-///| Execute a tool by name with JSON arguments.
+///|
+/// Execute a tool by name with JSON arguments.
 pub async fn execute_tool(
   name : String,
   arguments : String,
-  parent_context~ : @context.Context = @context.Context::empty(),
+  parent_context? : @context.Context = @context.Context::empty(),
 ) -> String {
   let tracer = get_agent_tracer()
   let builder = tracer
@@ -149,34 +169,40 @@ pub async fn execute_tool(
     "get_weather" => get_weather(arguments)
     "execute_command" => execute_command_tool(arguments)
     _ => {
-      span.set_status(@trace.Status::error(description=Some("Unknown tool: " + name)))
+      span.set_status(
+        @trace.Status::error(description=Some("Unknown tool: " + name)),
+      )
       "{\"error\": \"Unknown tool: " + name + "\"}"
     }
   }
 
   // Record whether the result indicates an error
   if result.contains("\"error\"") {
-    span.set_status(@trace.Status::error(description=Some("tool returned error")))
+    span.set_status(
+      @trace.Status::error(description=Some("tool returned error")),
+    )
   } else {
     span.set_status(@trace.Status::ok())
   }
-  span.set_attribute(@otel.KeyValue::new("gen_ai.tool.call.result", String(result)))
+  span.set_attribute(
+    @otel.KeyValue::new("gen_ai.tool.call.result", String(result)),
+  )
   span.end()
 
   result
 }
 
-///| Mock weather tool: always returns sunny 25°C.
+///|
+/// Mock weather tool: always returns sunny 25°C.
 fn get_weather(args : String) -> String {
   ignore(args)
   "{\"temperature\": 25, \"condition\": \"晴\"}"
 }
 
-///| Execute a shell command and return stdout as string.
+///|
+/// Execute a shell command and return stdout as string.
 async fn execute_command_tool(args_json : String) -> String {
-  let args = try {
-    @json.parse(args_json)
-  } catch {
+  let args = @json.parse(args_json) catch {
     _ => return "{\"error\": \"Invalid JSON arguments\"}"
   }
   let command = if args is { "command": String(cmd), .. } {
@@ -185,7 +211,9 @@ async fn execute_command_tool(args_json : String) -> String {
     return "{\"error\": \"Missing 'command' field\"}"
   }
   // Security: reject dangerous commands
-  let forbidden = ["rm", "mv", "cp", "dd", "mkfs", "fdisk", "format", "del", "rd", "rmdir"]
+  let forbidden = [
+    "rm", "mv", "cp", "dd", "mkfs", "fdisk", "format", "del", "rd", "rmdir",
+  ]
   let cmd_lower = command.trim().to_lower()
   for bad in forbidden {
     if cmd_lower.has_prefix(bad + " ") || cmd_lower == bad {
@@ -195,10 +223,15 @@ async fn execute_command_tool(args_json : String) -> String {
   // Run command and collect output
   let (code, stdout, _stderr) = @process.collect_output("sh", ["-c", command])
   let output = stdout.text()
-  "{\"exit_code\": " + code.to_string() + ", \"output\": \"" + escape_json(output) + "\"}"
+  "{\"exit_code\": " +
+  code.to_string() +
+  ", \"output\": \"" +
+  escape_json(output) +
+  "\"}"
 }
 
-///| Escape special characters in a JSON string value.
+///|
+/// Escape special characters in a JSON string value.
 fn escape_json(s : String) -> String {
   let sb = StringBuilder::new()
   for ch in s {

@@ -1,7 +1,8 @@
 // Copyright (c) 2026 Yingjie Shang
 // agent-observability is licensed under Mulan PSL v2.
 
-///| Available tools for the LLM.
+///|
+/// Available tools for the LLM.
 pub let tools : Array[Tool] = [
   Tool::new(
     name="get_weather",
@@ -20,7 +21,10 @@ pub let tools : Array[Tool] = [
     parameters={
       "type": "object",
       "properties": {
-        "command": { "type": "string", "description": "要执行的 shell 命令（例如: ls -la）" },
+        "command": {
+          "type": "string",
+          "description": "要执行的 shell 命令（例如: ls -la）",
+        },
       },
       "required": ["command"],
     },
