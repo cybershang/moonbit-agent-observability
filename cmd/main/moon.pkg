@@ -3,14 +3,9 @@ import {
   "moonbitlang/async",
   "moonbitlang/async/process",
   "moonbitlang/async/stdio",
-  "moonbitlang/core/env",
   "moonbitlang/core/random",
   "moonbit-community/opentelemetry/interface/common",
-  "moonbit-community/opentelemetry/sdk",
-  "moonbit-community/opentelemetry/sdk/resource",
   "moonbit-community/opentelemetry/sdk/trace" @sdktrace,
-  "moonbit-community/opentelemetry/otlp",
-  "moonbit-community/opentelemetry/print",
 }
 
 options(
