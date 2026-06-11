@@ -9,6 +9,7 @@ import {
   "moonbitlang/core/json" @json,
   "moonbitlang/core/string" @string,
   "moonbit-community/opentelemetry" @otel,
+  "moonbit-community/opentelemetry/interface/context" @context,
   "moonbit-community/opentelemetry/interface/trace" @trace,
   "moonbit-community/opentelemetry/sdk" @sdk,
   "moonbit-community/opentelemetry/sdk/trace" @sdktrace,
