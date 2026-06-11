@@ -82,6 +82,7 @@ moon run cmd/main
 
 ## 开发约定
 
+- **每次修改代码后必须运行 `moon fmt`**，确保代码格式一致后再提交。
 - 使用 `moonbitlang/async` 提供的异步原语（`async fn`、 `@http`、 `@fs`、 `@process`）。
 - 优先使用结构化类型（`struct Message`、`struct ToolCall`）而非裸 JSON，便于后续插桩。
 - 工具执行安全：execute_command 拒绝 rm / mv / cp 等危险命令。
