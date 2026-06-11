@@ -7,25 +7,32 @@
 
 ///|
 test "Tool::new creates tool with correct fields" {
-  let tool = Tool::new(
-    name="test_tool",
-    description="A test tool",
-    parameters={"type": "object"},
+  let tool = Tool::new(name="test_tool", description="A test tool", parameters={
+    "type": "object",
+  })
+  debug_inspect(
+    tool.name,
+    content=(
+      #|"test_tool"
+    ),
   )
-  debug_inspect(tool.name, content=(
-    #|"test_tool"
-  ))
-  debug_inspect(tool.description, content=(
-    #|"A test tool"
-  ))
+  debug_inspect(
+    tool.description,
+    content=(
+      #|"A test tool"
+    ),
+  )
 }
 
 ///|
 test "Message::new with defaults" {
   let msg = Message::new()
-  debug_inspect(msg.role, content=(
-    #|"user"
-  ))
+  debug_inspect(
+    msg.role,
+    content=(
+      #|"user"
+    ),
+  )
   debug_inspect(msg.content, content="None")
   debug_inspect(msg.tool_call_id, content="None")
 }
@@ -37,15 +44,24 @@ test "Message::new with all fields" {
     content=Some("hello"),
     tool_call_id=Some("call_123"),
   )
-  debug_inspect(msg.role, content=(
-    #|"assistant"
-  ))
-  debug_inspect(msg.content, content=(
-    #|Some("hello")
-  ))
-  debug_inspect(msg.tool_call_id, content=(
-    #|Some("call_123")
-  ))
+  debug_inspect(
+    msg.role,
+    content=(
+      #|"assistant"
+    ),
+  )
+  debug_inspect(
+    msg.content,
+    content=(
+      #|Some("hello")
+    ),
+  )
+  debug_inspect(
+    msg.tool_call_id,
+    content=(
+      #|Some("call_123")
+    ),
+  )
 }
 
 ///|
@@ -59,7 +75,11 @@ test "Message::to_json - user message with content" {
 
 ///|
 test "Message::to_json - assistant message with tool_calls" {
-  let call : ToolCall = { id: "call_1", name: "get_weather", arguments: "{\"city\":\"Beijing\"}" }
+  let call : ToolCall = {
+    id: "call_1",
+    name: "get_weather",
+    arguments: "{\"city\":\"Beijing\"}",
+  }
   let msg = Message::new(role="assistant", tool_calls=Some([call]))
   let json = msg.to_json()
   let s = json.stringify()
@@ -71,7 +91,11 @@ test "Message::to_json - assistant message with tool_calls" {
 
 ///|
 test "Message::to_json - tool message with tool_call_id" {
-  let msg = Message::new(role="tool", content=Some("sunny"), tool_call_id=Some("call_1"))
+  let msg = Message::new(
+    role="tool",
+    content=Some("sunny"),
+    tool_call_id=Some("call_1"),
+  )
   let json = msg.to_json()
   let s = json.stringify()
   assert_true(s.contains("\"role\":\"tool\""))
@@ -91,15 +115,24 @@ test "Message::to_json - message with null content" {
 ///|
 test "ToolCall record construction" {
   let call : ToolCall = { id: "abc", name: "test", arguments: "{}" }
-  debug_inspect(call.id, content=(
-    #|"abc"
-  ))
-  debug_inspect(call.name, content=(
-    #|"test"
-  ))
-  debug_inspect(call.arguments, content=(
-    #|"{}"
-  ))
+  debug_inspect(
+    call.id,
+    content=(
+      #|"abc"
+    ),
+  )
+  debug_inspect(
+    call.name,
+    content=(
+      #|"test"
+    ),
+  )
+  debug_inspect(
+    call.arguments,
+    content=(
+      #|"{}"
+    ),
+  )
 }
 
 ///|
@@ -110,12 +143,18 @@ test "Client::new with defaults" {
     model="step-3.7-flash",
     api_key="test-key",
   )
-  debug_inspect(client.provider_name, content=(
-    #|"stepfun"
-  ))
-  debug_inspect(client.model, content=(
-    #|"step-3.7-flash"
-  ))
+  debug_inspect(
+    client.provider_name,
+    content=(
+      #|"stepfun"
+    ),
+  )
+  debug_inspect(
+    client.model,
+    content=(
+      #|"step-3.7-flash"
+    ),
+  )
   debug_inspect(client.max_tokens, content="1024")
   debug_inspect(client.capture_content, content="false")
 }
@@ -143,12 +182,18 @@ test "LLMResponse record construction" {
     response_id: Some("id-1"),
     response_model: Some("model-x"),
   }
-  debug_inspect(resp.content, content=(
-    #|Some("hello")
-  ))
-  debug_inspect(resp.finish_reason, content=(
-    #|"stop"
-  ))
+  debug_inspect(
+    resp.content,
+    content=(
+      #|Some("hello")
+    ),
+  )
+  debug_inspect(
+    resp.finish_reason,
+    content=(
+      #|"stop"
+    ),
+  )
   debug_inspect(resp.tool_calls.length(), content="0")
 }
 

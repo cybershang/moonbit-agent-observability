@@ -11,19 +11,31 @@ test "parse_llm_response - normal text response" {
     "{\"id\":\"chat-123\",\"model\":\"step-3.7-flash\",\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"Hello!\"},\"finish_reason\":\"stop\"}]}",
   )
   let resp = parse_llm_response(data)
-  debug_inspect(resp.content, content=(
-    #|Some("Hello!")
-  ))
+  debug_inspect(
+    resp.content,
+    content=(
+      #|Some("Hello!")
+    ),
+  )
   debug_inspect(resp.tool_calls.length(), content="0")
-  debug_inspect(resp.finish_reason, content=(
-    #|"stop"
-  ))
-  debug_inspect(resp.response_id, content=(
-    #|Some("chat-123")
-  ))
-  debug_inspect(resp.response_model, content=(
-    #|Some("step-3.7-flash")
-  ))
+  debug_inspect(
+    resp.finish_reason,
+    content=(
+      #|"stop"
+    ),
+  )
+  debug_inspect(
+    resp.response_id,
+    content=(
+      #|Some("chat-123")
+    ),
+  )
+  debug_inspect(
+    resp.response_model,
+    content=(
+      #|Some("step-3.7-flash")
+    ),
+  )
 }
 
 ///|
@@ -33,19 +45,31 @@ test "parse_llm_response - tool_calls response" {
   )
   let resp = parse_llm_response(data)
   debug_inspect(resp.content, content="None")
-  debug_inspect(resp.finish_reason, content=(
-    #|"tool_calls"
-  ))
+  debug_inspect(
+    resp.finish_reason,
+    content=(
+      #|"tool_calls"
+    ),
+  )
   debug_inspect(resp.tool_calls.length(), content="1")
-  debug_inspect(resp.tool_calls[0].id, content=(
-    #|"call_1"
-  ))
-  debug_inspect(resp.tool_calls[0].name, content=(
-    #|"get_weather"
-  ))
-  debug_inspect(resp.tool_calls[0].arguments, content=(
-    #|"{\"city\":\"Beijing\"}"
-  ))
+  debug_inspect(
+    resp.tool_calls[0].id,
+    content=(
+      #|"call_1"
+    ),
+  )
+  debug_inspect(
+    resp.tool_calls[0].name,
+    content=(
+      #|"get_weather"
+    ),
+  )
+  debug_inspect(
+    resp.tool_calls[0].arguments,
+    content=(
+      #|"{\"city\":\"Beijing\"}"
+    ),
+  )
 }
 
 ///|
@@ -54,9 +78,12 @@ test "parse_llm_response - empty/invalid response" {
   let resp = parse_llm_response(data)
   debug_inspect(resp.content, content="None")
   debug_inspect(resp.tool_calls.length(), content="0")
-  debug_inspect(resp.finish_reason, content=(
-    #|""
-  ))
+  debug_inspect(
+    resp.finish_reason,
+    content=(
+      #|""
+    ),
+  )
   debug_inspect(resp.response_id, content="None")
   debug_inspect(resp.response_model, content="None")
 }
@@ -65,9 +92,12 @@ test "parse_llm_response - empty/invalid response" {
 test "parse_llm_response - missing choices array" {
   let data = @json.parse("{\"id\":\"test\",\"choices\":[]}")
   let resp = parse_llm_response(data)
-  debug_inspect(resp.finish_reason, content=(
-    #|""
-  ))
+  debug_inspect(
+    resp.finish_reason,
+    content=(
+      #|""
+    ),
+  )
   debug_inspect(resp.content, content="None")
 }
 
@@ -78,12 +108,18 @@ test "parse_llm_response - multiple tool calls" {
   )
   let resp = parse_llm_response(data)
   debug_inspect(resp.tool_calls.length(), content="2")
-  debug_inspect(resp.tool_calls[0].id, content=(
-    #|"c1"
-  ))
-  debug_inspect(resp.tool_calls[1].id, content=(
-    #|"c2"
-  ))
+  debug_inspect(
+    resp.tool_calls[0].id,
+    content=(
+      #|"c1"
+    ),
+  )
+  debug_inspect(
+    resp.tool_calls[1].id,
+    content=(
+      #|"c2"
+    ),
+  )
 }
 
 ///|
