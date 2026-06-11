@@ -50,7 +50,8 @@ pub async fn init_telemetry(
     .with_simple_exporter(exporter.into_span_exporter())
     .build()
   } else {
-    match @otlp.SpanExporter::builder()
+    match
+      @otlp.SpanExporter::builder()
       .with_http()
       .with_endpoint(settings.otel_endpoint)
       .build() {
