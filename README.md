@@ -1,5 +1,7 @@
 # agent-observability
 
+[![Check & Test](https://github.com/cybershang/moonbit-agent-observability/actions/workflows/ci.yml/badge.svg)](https://github.com/cybershang/moonbit-agent-observability/actions/workflows/ci.yml)
+
 基于 MoonBit 实现的精简 AI Agent，演示 Agent 核心运行链路的 OpenTelemetry 可观测性插桩。
 
 ## 演示Demo
@@ -195,10 +197,9 @@ Batch Span Processor 针对交互式 REPL 做了调优：
 - `OTEL_BSP_SCHEDULE_DELAY`
 - `OTEL_BSP_EXPORT_TIMEOUT`
 
-Agent 编排层（`Agent::run`）与工具执行层的 trace 插桩尚未实现，后续计划补充：
-- Agent turn 级别的 span
-- Tool 执行 span（含执行耗时、结果状态）
-- 多轮对话状态事件
+Agent 编排层（`Agent::run`）与工具执行层的 trace 插桩已完整实现：
+- ✅ **Agent turn 级别 span**（`agent.turn`）：记录输入/输出、实际工具调用轮数、最大允许轮数
+- ✅ **Tool 执行 span**（`gen_ai.tool.execution`）：记录工具名称、调用参数、执行结果、错误状态
 
 ## 项目结构
 
