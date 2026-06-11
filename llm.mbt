@@ -124,6 +124,7 @@ pub async fn Client::chat(
   self : Client,
   messages : Array[Message],
   tools~ : Array[Tool] = [],
+  parent_context~ : @context.Context = @context.Context::empty(),
 ) -> LLMResponse {
   let tracer = get_llm_tracer()
   let builder = tracer
@@ -135,7 +136,7 @@ pub async fn Client::chat(
       @otel.KeyValue::new(@semtrace.GEN_AI_REQUEST_MODEL, String(self.model)),
       @otel.KeyValue::new(@semtrace.GEN_AI_REQUEST_MAX_TOKENS, Int64(self.max_tokens.to_int64())),
     ])
-  let span = tracer.build(builder)
+  let span = tracer.build_with_context(builder, parent_context)
 
   // Capture input messages as span attribute when enabled
   if self.capture_content {

@@ -66,6 +66,7 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
       @otel.KeyValue::new("agent.turn.max_tool_turns", Int64(self.max_tool_turns.to_int64())),
     ])
   let span = tracer.build(builder)
+  let parent_context = span.context()
 
   self.messages.push(Message::new(content=Some(prompt)))
 
@@ -75,7 +76,11 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
   let executed : Array[ToolCallRecord] = []
   while has_tool_calls && turn < self.max_tool_turns {
     turn = turn + 1
-    let response = self.client.chat(self.messages, tools=self.tools)
+    let response = self.client.chat(
+      self.messages,
+      tools=self.tools,
+      parent_context=parent_context,
+    )
     if response.finish_reason == "tool_calls" {
       // Add assistant message with tool_calls
       self.messages.push(Message::new(
@@ -84,7 +89,7 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
       ))
       // Execute each tool call and add tool results
       for call in response.tool_calls {
-        let result = execute_tool(call.name, call.arguments)
+        let result = execute_tool(call.name, call.arguments, parent_context=parent_context)
         executed.push({ call, result })
         self.messages.push(Message::new(
           role="tool",
@@ -125,7 +130,11 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
 }
 
 ///| Execute a tool by name with JSON arguments.
-pub async fn execute_tool(name : String, arguments : String) -> String {
+pub async fn execute_tool(
+  name : String,
+  arguments : String,
+  parent_context~ : @context.Context = @context.Context::empty(),
+) -> String {
   let tracer = get_agent_tracer()
   let builder = tracer
     .span_builder("gen_ai.tool.execution")
@@ -134,7 +143,7 @@ pub async fn execute_tool(name : String, arguments : String) -> String {
       @otel.KeyValue::new("gen_ai.tool.name", String(name)),
       @otel.KeyValue::new("gen_ai.tool.call.arguments", String(arguments)),
     ])
-  let span = tracer.build(builder)
+  let span = tracer.build_with_context(builder, parent_context)
 
   let result = match name {
     "get_weather" => get_weather(arguments)
