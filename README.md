@@ -64,7 +64,6 @@ flowchart TD
     OTel -.->|GenAI 语义约定| Client
     OTel -.-> TR
 ```
-```
 
 ## 核心模块
 
