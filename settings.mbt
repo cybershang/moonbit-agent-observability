@@ -14,6 +14,7 @@ pub struct Settings {
   max_tool_turns : Int
   // Observability
   otel_stdout : Bool
+  otel_endpoint : String
   capture_content : Bool
 }
 
@@ -27,6 +28,10 @@ pub async fn Settings::from_env() -> Settings {
   let max_tokens = parse_int(env("LLM_MAX_TOKENS", default="1024"), 1024)
   let max_tool_turns = parse_int(env("AGENT_MAX_TOOL_TURNS", default="10"), 10)
   let otel_stdout = env("OTEL_STDOUT").to_lower() == "true"
+  let otel_endpoint = env(
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+    default="http://localhost:4318",
+  )
   let capture_content = env("CAPTURE_CONTENT").to_lower() == "true"
   {
     provider_name,
@@ -36,6 +41,7 @@ pub async fn Settings::from_env() -> Settings {
     max_tokens,
     max_tool_turns,
     otel_stdout,
+    otel_endpoint,
     capture_content,
   }
 }
