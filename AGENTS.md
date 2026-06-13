@@ -2,15 +2,13 @@
 
 本项目是一个基于 MoonBit 语言实现的 AI Agent，目标是对 Agent 的核心运行链路进行 OpenTelemetry 插桩，暴露可观测性数据（trace、span、event）。
 
-**当前状态**：早期实现阶段。设计文档（`agent_implementation_prompt.md`）规划了 4 个模块（DialogueEngine、LLMGateway、ToolRouter、TaskScheduler）。
+**当前状态**：早期实现阶段。设计文档规划了 3 个核心模块（DialogueEngine、LLMGateway、ToolRouter）。
 
 已实现：
 - `LLMGateway`（`llm.mbt`）：完整的 HTTP 调用、Tool Call 检测与解析、多轮对话消息累积。
 - `ToolRouter`（`tools.mbt`）：工具注册与执行框架，含 `get_weather`（mock）和 `execute_command`（安全受限的系统命令执行）两个工具。
 - `DialogueEngine`（`cmd/main/main.mbt`）：REPL 主循环支持连续对话上下文和自动 Tool Call 闭环。
 - OpenTelemetry 插桩（`agent.mbt`、`telemetry.mbt`）：基于 `moonbit-community/opentelemetry` 对 Agent 运行链路进行 trace/span 埋点，支持 OTLP/HTTP 导出到本地 Collector 或任意可配置端点。
-
-尚未实现：TaskScheduler。
 
 ## 技术栈
 
