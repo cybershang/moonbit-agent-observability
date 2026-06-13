@@ -3,6 +3,7 @@ import {
   "moonbitlang/async",
   "moonbitlang/async/process",
   "moonbitlang/async/stdio",
+  "moonbitlang/core/argparse",
   "moonbitlang/core/random",
   "moonbit-community/opentelemetry/interface/common",
   "moonbit-community/opentelemetry/sdk/trace" @sdktrace,

@@ -3,6 +3,7 @@
 
 ///|
 async fn main {
+  let ask = parse_ask_arg()
   let settings = @agent.Settings::from_env()
 
   // Use a fresh random ID generator seeded from the current timestamp so trace/span IDs
@@ -20,42 +21,78 @@ async fn main {
     max_tool_turns=settings.max_tool_turns,
   )
 
-  // REPL with continuous dialogue
-  while true {
-    @stdio.stdout.write("> ")
-    let prompt = match @stdio.stdin.read_until("\n") {
-      Some(line) => line.trim(char_set="\r\n").to_owned()
-      None => break
+  match ask {
+    Some(query) => {
+      // Non-interactive mode: run a single turn and exit.
+      let turn = agent.run(query)
+      print_turn(turn)
+      // Swallow export errors so a missing collector does not fail the run.
+      let _ = provider.force_flush() catch { _ => Ok(()) }
+      let _ = provider.shutdown() catch { _ => Ok(()) }
     }
-    if prompt == "exit" || prompt == "quit" {
-      break
-    }
+    None => {
+      // REPL with continuous dialogue
+      while true {
+        @stdio.stdout.write("> ")
+        let prompt = match @stdio.stdin.read_until("\n") {
+          Some(line) => line.trim(char_set="\r\n").to_owned()
+          None => break
+        }
+        if prompt == "exit" || prompt == "quit" {
+          break
+        }
 
-    // Ensure spans are flushed to the OTLP collector after each turn.
-    // This is especially important for the batch exporter so telemetry
-    // is not lost when the process exits shortly after the loop.
-    ignore(provider.force_flush())
+        // Ensure spans are flushed to the OTLP collector after each turn.
+        // This is especially important for the batch exporter so telemetry
+        // is not lost when the process exits shortly after the loop.
+        ignore(provider.force_flush())
 
-    let turn = agent.run(prompt)
-    for record in turn.tool_calls {
-      @stdio.stdout.write(
-        "\n[Tool Call] " +
-        record.call.name +
-        "(" +
-        record.call.arguments +
-        ")\n",
-      )
-      let display_result = if record.result.length() > 200 {
-        record.result[:200].to_owned() + "... (truncated)"
-      } else {
-        record.result
+        let turn = agent.run(prompt)
+        print_turn(turn)
       }
-      @stdio.stdout.write("[Tool Result] " + display_result + "\n")
-    }
-    @stdio.stdout.write(turn.reply)
-    @stdio.stdout.write("\n")
-  }
 
-  // Gracefully shut down the tracer provider so pending spans are exported.
-  ignore(provider.shutdown())
+      // Gracefully shut down the tracer provider so pending spans are exported.
+      ignore(provider.shutdown())
+    }
+  }
+}
+
+///|
+/// Parse the `--ask` / `-a` command-line option for non-interactive mode.
+fn parse_ask_arg() -> String? {
+  let matches = @argparse.Command(
+    "agent-observability",
+    about="An observable AI Agent built with MoonBit.",
+    options=[
+      OptionArg(
+        "ask",
+        short='a',
+        about="Run a single query in non-interactive mode and exit.",
+      ),
+    ],
+  ).parse() catch {
+    _ => return None
+  }
+  match matches.values {
+    { "ask": [query], .. } => Some(query)
+    _ => None
+  }
+}
+
+///|
+/// Print the result of a single agent turn, including any tool calls and the reply.
+async fn print_turn(turn : @agent.AgentTurnResult) -> Unit {
+  for record in turn.tool_calls {
+    @stdio.stdout.write(
+      "\n[Tool Call] " + record.call.name + "(" + record.call.arguments + ")\n",
+    )
+    let display_result = if record.result.length() > 200 {
+      record.result[:200].to_owned() + "... (truncated)"
+    } else {
+      record.result
+    }
+    @stdio.stdout.write("[Tool Result] " + display_result + "\n")
+  }
+  @stdio.stdout.write(turn.reply)
+  @stdio.stdout.write("\n")
 }
