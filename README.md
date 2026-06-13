@@ -114,6 +114,9 @@ moon check
 
 # 运行 REPL
 moon run cmd/main
+
+# 非交互式单次运行（适合 CI / 演示 / 脚本）
+moon run cmd/main -- --ask "北京今天天气怎么样？"
 ```
 
 ### 测试
@@ -209,6 +212,7 @@ agent-observability/
 ├── llm.mbt                     # Client：类型定义 + HTTP 封装 + OTel 插桩
 ├── llm_test.mbt                # Client 白盒测试
 ├── agent.mbt                   # Agent：对话编排 + tool 执行
+├── agent_test.mbt              # Agent 端到端冒烟测试（真实 LLM API）
 ├── tools.mbt                   # ToolRegistry：工具定义
 ├── settings.mbt                # Settings：集中配置管理 + .env 读取辅助
 ├── .env.example                # 配置模板
