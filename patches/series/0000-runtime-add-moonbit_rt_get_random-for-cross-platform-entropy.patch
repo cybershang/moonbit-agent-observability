@@ -1,0 +1,43 @@
+From: Yingjie Shang <cybershang>
+Date: Tue, 16 Jun 2026
+Subject: [PATCH 0/5] runtime: add moonbit_rt_get_random for cross-platform entropy
+
+Needed by PR #3689: moonbitlang/core uses a unified FFI to get OS entropy.
+The MoonBit code calls moonbit_rt_get_random(buf, len), and this runtime
+function selects the right OS API via C preprocessor:
+
+  - Windows: rand_s()
+  - POSIX:   getentropy()
+
+Apply to: $MOON_HOME/lib/runtime.c  (MoonBit toolchain runtime)
+
+---
+ lib/runtime.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/lib/runtime.c b/lib/runtime.c
+index abc123..def456 100644
+--- a/lib/runtime.c
++++ b/lib/runtime.c
+@@ -2559,6 +2559,21 @@ MOONBIT_EXPORT void moonbit_rt_unset_env_var(moonbit_bytes_t key) {
+ #endif
+ }
+
++MOONBIT_EXPORT int32_t moonbit_rt_get_random(moonbit_bytes_t buf, int32_t len) {
++  if (len <= 0) return 0;
++#ifdef _WIN32
++  for (int32_t i = 0; i < len; i += 4) {
++    unsigned int word;
++    if (rand_s(&word) != 0) return -1;
++    int32_t copy = (len - i < 4) ? (len - i) : 4;
++    memcpy(buf + i, &word, copy);
++  }
++  return 0;
++#else
++  return getentropy(buf, (size_t)len);
++#endif
++}
++
+ MOONBIT_EXPORT FILE *moonbit_fopen_ffi(moonbit_bytes_t path,
+                                        moonbit_bytes_t mode) {
+   return fopen((const char *)path, (const char *)mode);

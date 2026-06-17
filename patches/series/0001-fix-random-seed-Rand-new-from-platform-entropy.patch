@@ -1,0 +1,327 @@
+From 77b4ea32d1094b54cb191ef7e7cf9c836775f854 Mon Sep 17 00:00:00 2001
+From: Yingjie Shang <dev@yingjie.dev>
+Date: Tue, 16 Jun 2026 20:36:08 +0800
+Subject: [PATCH 1/5] fix(random): seed Rand::new() from platform entropy
+
+- Add @env.rand(n) -> Bytes? for native, JS, and WASM/WASM-GC
+- Native uses getrandom(2); JS uses crypto.getRandomValues
+- WASM/WASM-GC returns None until raw pointer FFI is available
+- Update Rand::new() to prefer OS entropy and fall back to time+counter
+- Make deterministic tests use explicit Rand::chacha8(seed=)
+- Add regression test that two Rand::new() instances differ
+---
+ builtin/array_test.mbt | 12 ++++++++----
+ env/env.mbt            |  8 ++++++++
+ env/env_js.mbt         | 19 +++++++++++++++++++
+ env/env_native.mbt     | 18 ++++++++++++++++++
+ env/env_test.mbt       |  8 ++++++++
+ env/env_wasm.mbt       |  8 ++++++++
+ env/pkg.generated.mbti |  2 ++
+ random/moon.pkg        |  1 +
+ random/random.mbt      | 43 ++++++++++++++++++++++++++++++++++--------
+ random/random_test.mbt | 16 +++++++++++++---
+ 10 files changed, 120 insertions(+), 15 deletions(-)
+
+diff --git a/builtin/array_test.mbt b/builtin/array_test.mbt
+index e3daf081..17d545df 100644
+--- a/builtin/array_test.mbt
++++ b/builtin/array_test.mbt
+@@ -1226,13 +1226,17 @@ test "push_iter" {
+ ///|
+ test "shuffle_in_place" {
+   let arr : Array[Int] = [1, 2, 3, 4, 5, 6, 7]
+-  fn rand(upper : Int) -> Int {
+-    let rng = @random.Rand::new()
++  fn rand1(upper : Int) -> Int {
++    let rng = @random.Rand::chacha8(seed=b"ABCDEFGHIJKLMNOPQRSTUVWXYZ123456")
++    rng.int() % upper
++  }
++  fn rand2(upper : Int) -> Int {
++    let rng = @random.Rand::chacha8(seed=b"ABCDEFGHIJKLMNOPQRSTUVWXYZ123456")
+     rng.int() % upper
+   }
+ 
+-  let shuffled = Array::shuffle(arr, rand~)
+-  Array::shuffle_in_place(arr, rand~)
++  let shuffled = Array::shuffle(arr, rand=rand1)
++  Array::shuffle_in_place(arr, rand=rand2)
+   @test.assert_eq(shuffled, arr)
+   debug_inspect(arr, content="[3, 2, 1, 5, 6, 7, 4]")
+ }
+diff --git a/env/env.mbt b/env/env.mbt
+index 311f06ab..f837a6da 100644
+--- a/env/env.mbt
++++ b/env/env.mbt
+@@ -53,3 +53,11 @@ pub fn set_env_var(key : String, value : String) -> Unit {
+ pub fn unset_env_var(key : String) -> Unit {
+   unset_env_var_internal(key)
+ }
++
++///|
++/// Get `n` random bytes from a platform entropy source.
++/// Returns `Some(bytes)` when the platform can provide secure random bytes,
++/// and `None` on targets/environments that do not support entropy.
++pub fn rand(n : Int) -> Bytes? {
++  rand_internal(n)
++}
+diff --git a/env/env_js.mbt b/env/env_js.mbt
+index e080c313..6d1ef0ed 100644
+--- a/env/env_js.mbt
++++ b/env/env_js.mbt
+@@ -119,3 +119,22 @@ extern "js" fn unset_env_var_ffi(key : String) -> Unit =
+   #|     delete process.env[key];
+   #|   }
+   #| }
++
++///|
++fn rand_internal(n : Int) -> Bytes? {
++  if n <= 0 {
++    return Some(b"")
++  }
++  get_random_values_js(n)
++}
++
++///|
++extern "js" fn get_random_values_js(n : Int) -> Bytes? =
++  #| function(n) {
++  #|   if (typeof crypto === "undefined" || typeof crypto.getRandomValues !== "function") {
++  #|     return null;
++  #|   }
++  #|   const arr = new Uint8Array(n);
++  #|   crypto.getRandomValues(arr);
++  #|   return arr;
++  #| }
+diff --git a/env/env_native.mbt b/env/env_native.mbt
+index c433f4fe..3c0e3f46 100644
+--- a/env/env_native.mbt
++++ b/env/env_native.mbt
+@@ -176,3 +176,21 @@ fn unset_env_var_internal(key : String) -> Unit {
+ ///|
+ #borrow(_key)
+ extern "c" fn unset_env_var_ffi(_key : Bytes) -> Unit = "moonbit_rt_unset_env_var"
++
++///|
++fn rand_internal(n : Int) -> Bytes? {
++  if n <= 0 {
++    return Some(b"")
++  }
++  let buf = Bytes::new(n)
++  let got = getrandom(buf, n.reinterpret_as_uint(), 0U)
++  if got < n {
++    None
++  } else {
++    Some(buf)
++  }
++}
++
++///|
++#borrow(buf)
++extern "c" fn getrandom(buf : Bytes, len : UInt, flags : UInt) -> Int = "getrandom"
+diff --git a/env/env_test.mbt b/env/env_test.mbt
+index 0e0c76e8..85005ac8 100644
+--- a/env/env_test.mbt
++++ b/env/env_test.mbt
+@@ -31,6 +31,14 @@ test "current_dir returns reasonable directory" {
+   assert_false(dir is None)
+ }
+ 
++///|
++test "rand returns requested length or none" {
++  match @env.rand(32) {
++    Some(bytes) => @test.assert_eq(bytes.length(), 32)
++    None => () // acceptable on platforms without entropy
++  }
++}
++
+ ///|
+ test "env var round trip" {
+   let key = "__MOONBIT_CORE_ENV_TEST_" + @env.now().to_string()
+diff --git a/env/env_wasm.mbt b/env/env_wasm.mbt
+index 0be79d28..2c37bd50 100644
+--- a/env/env_wasm.mbt
++++ b/env/env_wasm.mbt
+@@ -174,3 +174,11 @@ fn unset_env_var_internal(key : String) -> Unit {
+ 
+ ///|
+ fn unset_env_var_ffi(key : XExternString) = "__moonbit_fs_unstable" "unset_env_var"
++
++///|
++fn rand_internal(_n : Int) -> Bytes? {
++  // WASI random_get requires a raw linear-memory pointer, which is not
++  // accessible through the public FFI. Return None until a runtime helper
++  // is available.
++  None
++}
+diff --git a/env/pkg.generated.mbti b/env/pkg.generated.mbti
+index 37952568..0c8e1d74 100644
+--- a/env/pkg.generated.mbti
++++ b/env/pkg.generated.mbti
+@@ -12,6 +12,8 @@ pub fn get_env_vars() -> Map[String, String]
+ 
+ pub fn now() -> UInt64
+ 
++pub fn rand(Int) -> Bytes?
++
+ pub fn set_env_var(String, String) -> Unit
+ 
+ pub fn unset_env_var(String) -> Unit
+diff --git a/random/moon.pkg b/random/moon.pkg
+index 5e255d39..799d15d5 100644
+--- a/random/moon.pkg
++++ b/random/moon.pkg
+@@ -1,6 +1,7 @@
+ import {
+   "moonbitlang/core/builtin",
+   "moonbitlang/core/double",
++  "moonbitlang/core/env",
+   "moonbitlang/core/float",
+   "moonbitlang/core/random/internal/random_source",
+   "moonbitlang/core/bigint",
+diff --git a/random/random.mbt b/random/random.mbt
+index 798efe1d..22387b74 100644
+--- a/random/random.mbt
++++ b/random/random.mbt
+@@ -42,11 +42,38 @@ pub fn Rand::chacha8(
+   Rand(@random_source.ChaCha8(seed) as &Source)
+ }
+ 
++///|
++let fixed_test_seed : Bytes = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ123456"
++
++///|
++priv struct SeedCounter {
++  mut value : UInt64
++}
++
++///|
++let seed_counter : SeedCounter = { value: 0UL }
++
++///|
++fn make_fallback_seed() -> Bytes {
++  let time = @env.now()
++  let c = seed_counter.value
++  seed_counter.value += 1UL
++  Bytes::makei(32, fn(i) {
++    let time_byte = (time >> (i % 8 * 8)).to_byte()
++    let counter_byte = (c >> (i % 8 * 8)).to_byte()
++    (time_byte.to_int() ^ counter_byte.to_int()).to_byte()
++  })
++}
++
+ ///|
+ /// Create a new random number generator with a given [Gen] source.
+ pub fn Rand::new(generator? : &Source) -> Rand {
+   match generator {
+-    None => Rand::chacha8()
++    None =>
++      match @env.rand(32) {
++        Some(seed) => Rand::chacha8(seed~)
++        None => Rand::chacha8(seed=make_fallback_seed())
++      }
+     Some(gen) => Rand(gen)
+   }
+ }
+@@ -59,7 +86,7 @@ fn Rand::next(self : Rand) -> UInt64 {
+ 
+ ///|
+ test "next" {
+-  let r = Rand::new()
++  let r = Rand::chacha8(seed=fixed_test_seed)
+   let n = r.next()
+   let exp = 13219109469176600229UL
+   @test.assert_eq(n, exp)
+@@ -122,7 +149,7 @@ pub fn Rand::uint(self : Rand, limit? : UInt = 0) -> UInt {
+ 
+ ///|
+ test "uint" {
+-  let r = Rand::new()
++  let r = Rand::chacha8(seed=fixed_test_seed)
+   let n = r.uint(limit=10U)
+   inspect(n, content="7")
+   let n = r.uint(limit=10U)
+@@ -160,11 +187,11 @@ pub fn Rand::uint64(self : Rand, limit? : UInt64 = 0) -> UInt64 {
+ 
+ ///|
+ test "UInt64" {
+-  let r = Rand::new()
++  let r = Rand::chacha8(seed=fixed_test_seed)
+   let n = r.uint64()
+   let exp = 13219109469176600229UL
+   @test.assert_eq(n, exp)
+-  let r = Rand::new()
++  let r = Rand::chacha8(seed=fixed_test_seed)
+   let n = r.uint64(limit=10UL)
+   inspect(n, content="7")
+   let n = r.uint64(limit=10UL)
+@@ -182,7 +209,7 @@ pub fn Rand::double(self : Rand) -> Double {
+ 
+ ///|
+ test "double" {
+-  let r = Rand::new()
++  let r = Rand::chacha8(seed=fixed_test_seed)
+   let n = r.double()
+   inspect(n, content="0.615969772029264")
+ }
+@@ -232,7 +259,7 @@ pub fn Rand::bigint(self : Rand, bits : Int) -> @bigint.BigInt {
+ 
+ ///|
+ test "bigint" {
+-  let r = Rand::new()
++  let r = Rand::chacha8(seed=fixed_test_seed)
+   inspect(r.bigint(1), content="1")
+   inspect(r.bigint(3), content="4")
+   inspect(r.bigint(7), content="124")
+@@ -328,7 +355,7 @@ pub fn Rand::shuffle(
+ 
+ ///|
+ test "shuffle" {
+-  let r = Rand::new()
++  let r = Rand::chacha8(seed=fixed_test_seed)
+   let a = [1, 2, 3, 4, 5]
+   r.shuffle(a.length(), (i : Int, j : Int) => {
+     let t = a[i]
+diff --git a/random/random_test.mbt b/random/random_test.mbt
+index 11189007..1a3a203c 100644
+--- a/random/random_test.mbt
++++ b/random/random_test.mbt
+@@ -12,9 +12,12 @@
+ // See the License for the specific language governing permissions and
+ // limitations under the License.
+ 
++///|
++let fixed_test_seed : Bytes = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ123456"
++
+ ///|
+ test "prng" {
+-  let r = @random.Rand::new()
++  let r = @random.Rand::chacha8(seed=fixed_test_seed)
+   @test.assert_eq(r.uint(limit=10), 7)
+   @test.assert_eq(r.uint(limit=10), 0)
+   @test.assert_eq(r.uint(limit=10), 5)
+@@ -59,7 +62,7 @@ test "Rand::new with generator" {
+ 
+ ///|
+ test {
+-  let random = @random.Rand::new()
++  let random = @random.Rand::chacha8(seed=fixed_test_seed)
+   inspect(random.float(), content="0.27378302812576294")
+   inspect(random.float(), content="0.4169347286224365")
+   inspect(random.float(), content="0.5513989925384521")
+@@ -116,6 +119,13 @@ test "bench random" (b : @bench.T) {
+ 
+ ///|
+ test "boolean" {
+-  let result = @random.Rand::new()
++  let result = @random.Rand::chacha8(seed=fixed_test_seed)
+   inspect(result.boolean(), content="true")
+ }
++
++///|
++test "Rand::new is not deterministic" {
++  let r1 = @random.Rand::new()
++  let r2 = @random.Rand::new()
++  @test.assert_not_eq(r1.uint64(), r2.uint64())
++}
+-- 
+2.54.0
+

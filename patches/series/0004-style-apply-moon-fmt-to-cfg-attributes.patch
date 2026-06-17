@@ -1,0 +1,48 @@
+From 40c88e83e32ba7ef052c6a5f69ea79a31256e40f Mon Sep 17 00:00:00 2001
+From: Yingjie Shang <dev@yingjie.dev>
+Date: Tue, 16 Jun 2026 21:50:18 +0800
+Subject: [PATCH 4/5] style: apply moon fmt to #cfg attributes
+
+---
+ env/env_native.mbt | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/env/env_native.mbt b/env/env_native.mbt
+index 0a4cb052..98bc80d2 100644
+--- a/env/env_native.mbt
++++ b/env/env_native.mbt
+@@ -178,7 +178,7 @@ fn unset_env_var_internal(key : String) -> Unit {
+ extern "c" fn unset_env_var_ffi(_key : Bytes) -> Unit = "moonbit_rt_unset_env_var"
+ 
+ ///|
+-#cfg(target_os = "windows")
++#cfg(target_os="windows")
+ fn rand_internal(n : Int) -> Bytes? {
+   if n <= 0 {
+     return Some(b"")
+@@ -200,12 +200,12 @@ fn rand_internal(n : Int) -> Bytes? {
+ }
+ 
+ ///|
+-#cfg(target_os = "windows")
++#cfg(target_os="windows")
+ #borrow(value)
+ extern "c" fn rand_s(value : Bytes) -> Int = "rand_s"
+ 
+ ///|
+-#cfg(not(target_os = "windows"))
++#cfg(not(target_os="windows"))
+ fn rand_internal(n : Int) -> Bytes? {
+   if n <= 0 {
+     return Some(b"")
+@@ -228,6 +228,6 @@ fn rand_internal(n : Int) -> Bytes? {
+ }
+ 
+ ///|
+-#cfg(not(target_os = "windows"))
++#cfg(not(target_os="windows"))
+ #borrow(buf)
+ extern "c" fn getentropy(buf : FixedArray[Byte], len : UInt) -> Int = "getentropy"
+-- 
+2.54.0
+
