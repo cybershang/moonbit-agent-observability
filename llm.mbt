@@ -96,28 +96,6 @@ pub fn Client::from_settings(settings : Settings) -> Client {
   )
 }
 
-///| OpenTelemetry tracer
-
-///|
-/// Lazily-initialized tracer for the LLMGateway module.
-let llm_tracer : Ref[@trace.Tracer?] = Ref(None)
-
-///|
-/// Get or create the LLMGateway tracer.
-fn get_llm_tracer() -> @trace.Tracer {
-  match llm_tracer.val {
-    Some(t) => t
-    None => {
-      let t = @otel.tracer(
-        "yingjie/agent-observability/llm",
-        version=Some("0.1.0"),
-      )
-      llm_tracer.val = Some(t)
-      t
-    }
-  }
-}
-
 ///| Public API
 
 ///|
@@ -141,31 +119,20 @@ pub async fn Client::chat(
   tools? : Array[Tool] = [],
   parent_context? : @context.Context = @context.Context::empty(),
 ) -> LLMResponse {
-  let tracer = get_llm_tracer()
-  let builder = tracer
-    .span_builder("gen_ai.chat")
-    .with_kind(@trace.Client)
-    .with_attributes([
-      @otel.KeyValue::new(@semtrace.GEN_AI_OPERATION_NAME, String("chat")),
-      @otel.KeyValue::new("gen_ai.provider.name", String(self.provider_name)),
-      @otel.KeyValue::new(@semtrace.GEN_AI_REQUEST_MODEL, String(self.model)),
-      @otel.KeyValue::new(
-        @semtrace.GEN_AI_REQUEST_MAX_TOKENS,
-        Int64(self.max_tokens.to_int64()),
-      ),
-    ])
-  let span = tracer.build_with_context(builder, parent_context)
-
-  // Capture input messages as span attribute when enabled
-  if self.capture_content {
-    let input_messages = messages_to_json_array(messages)
-    span.set_attribute(
-      @otel.KeyValue::new(
-        "gen_ai.input.messages",
-        String(input_messages.stringify()),
-      ),
-    )
+  let tracer = @telemetry.tracer("cybershang/agent-observability/llm")
+  let input_messages = if self.capture_content {
+    Some(messages_to_json_array(messages))
+  } else {
+    None
   }
+  let span = @telemetry.start_chat_span(
+    tracer,
+    self.provider_name,
+    self.model,
+    self.max_tokens,
+    input_messages~,
+    parent_context~,
+  )
 
   let body_json = build_request_json(
     messages,
@@ -186,13 +153,8 @@ pub async fn Client::chat(
   )
 
   guard response.code == 200 else {
-    span.set_status(
-      @trace.Status::error(description=Some("HTTP \{response.code}")),
-    )
-    span.add_event("llm.http_error", attributes=[
-      @otel.KeyValue::new("http.status_code", Int64(response.code.to_int64())),
-    ])
-    span.end()
+    @telemetry.set_chat_http_error(span, response.code)
+    @telemetry.end_span(span)
     abort("LLM request failed with status: \{response.code}")
   }
 
@@ -205,66 +167,20 @@ pub async fn Client::chat(
   } else {
     None
   }
-
   match usage {
-    Some(u) => {
-      if u is { "prompt_tokens": Number(pt, ..), .. } {
-        span.set_attribute(
-          @otel.KeyValue::new(
-            @semtrace.GEN_AI_USAGE_INPUT_TOKENS,
-            Int64(pt.to_int64()),
-          ),
-        )
-      }
-      if u is { "completion_tokens": Number(ct, ..), .. } {
-        span.set_attribute(
-          @otel.KeyValue::new(
-            @semtrace.GEN_AI_USAGE_OUTPUT_TOKENS,
-            Int64(ct.to_int64()),
-          ),
-        )
-      }
-    }
+    Some(u) => @telemetry.record_chat_usage(span, u)
     None => ()
   }
 
-  // Record response metadata
-  if llm_resp.finish_reason != "" {
-    span.set_attribute(
-      @otel.KeyValue::new(
-        @semtrace.GEN_AI_RESPONSE_FINISH_REASONS,
-        String(llm_resp.finish_reason),
-      ),
-    )
+  // Record response metadata and optional output messages
+  let output_messages = if self.capture_content {
+    Some(output_messages_to_json_array(llm_resp))
+  } else {
+    None
   }
-  match llm_resp.response_id {
-    Some(id) =>
-      span.set_attribute(
-        @otel.KeyValue::new(@semtrace.GEN_AI_RESPONSE_ID, String(id)),
-      )
-    None => ()
-  }
-  match llm_resp.response_model {
-    Some(m) =>
-      span.set_attribute(
-        @otel.KeyValue::new(@semtrace.GEN_AI_RESPONSE_MODEL, String(m)),
-      )
-    None => ()
-  }
+  @telemetry.record_chat_response(span, data, output_messages~)
 
-  // Record output messages as span attribute when enabled
-  if self.capture_content {
-    let output_messages = output_messages_to_json_array(llm_resp)
-    span.set_attribute(
-      @otel.KeyValue::new(
-        "gen_ai.output.messages",
-        String(output_messages.stringify()),
-      ),
-    )
-  }
-
-  span.set_status(@trace.Status::ok())
-  span.end()
+  @telemetry.end_span_ok(span)
 
   llm_resp
 }

@@ -6,12 +6,12 @@ async fn main {
   let ask = parse_ask_arg()
   let settings = @agent.Settings::from_env()
 
-  // Use a fresh random ID generator seeded from the current timestamp so trace/span IDs
-  // are unique across process restarts.
-  let id_generator = make_random_id_generator()
-
-  // Initialize the global OpenTelemetry tracer provider.
-  let provider = @agent.init_telemetry(settings, id_generator)
+  // Initialize the global OpenTelemetry tracer provider from env.
+  // Use ProcessUniqueRandom to avoid duplicate trace/span IDs across restarts.
+  let provider = @telemetry.init_from_env(
+    service_name="agent-observability",
+    id_generator=@telemetry.ProcessUniqueRandom,
+  )
 
   // Create the client and agent from settings
   let client = @agent.Client::from_settings(settings)

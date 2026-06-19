@@ -1,12 +1,9 @@
 import {
-  "yingjie/agent-observability" @agent,
+  "cybershang/agent-observability" @agent,
+  "cybershang/agent-telemetry" @telemetry,
   "moonbitlang/async",
-  "moonbitlang/async/process",
   "moonbitlang/async/stdio",
   "moonbitlang/core/argparse",
-  "moonbitlang/core/random",
-  "moonbit-community/opentelemetry/interface/common",
-  "moonbit-community/opentelemetry/sdk/trace" @sdktrace,
 }
 
 options(

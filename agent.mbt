@@ -2,26 +2,6 @@
 // agent-observability is licensed under Mulan PSL v2.
 
 ///|
-/// OpenTelemetry tracer for the Agent module.
-let agent_tracer : Ref[@trace.Tracer?] = Ref(None)
-
-///|
-/// Get or create the Agent tracer.
-fn get_agent_tracer() -> @trace.Tracer {
-  match agent_tracer.val {
-    Some(t) => t
-    None => {
-      let t = @otel.tracer(
-        "yingjie/agent-observability/agent",
-        version=Some("0.1.0"),
-      )
-      agent_tracer.val = Some(t)
-      t
-    }
-  }
-}
-
-///|
 /// An agent that orchestrates LLM chat with tool calls.
 ///
 /// The agent maintains conversation history and automatically executes
@@ -67,18 +47,12 @@ pub struct AgentTurnResult {
 /// is received. Returns the assistant's reply and a record of any tool
 /// calls executed during the turn.
 pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
-  let tracer = get_agent_tracer()
-  let builder = tracer
-    .span_builder("agent.turn")
-    .with_kind(@trace.Internal)
-    .with_attributes([
-      @otel.KeyValue::new("agent.turn.input", String(prompt)),
-      @otel.KeyValue::new(
-        "agent.turn.max_tool_turns",
-        Int64(self.max_tool_turns.to_int64()),
-      ),
-    ])
-  let span = tracer.build(builder)
+  let tracer = @telemetry.tracer("cybershang/agent-observability/agent")
+  let span = @telemetry.start_agent_turn_span(
+    tracer,
+    prompt,
+    self.max_tool_turns,
+  )
   let parent_context = span.context()
 
   self.messages.push(Message::new(content=Some(prompt)))
@@ -124,26 +98,11 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
   // If we hit the turn limit without a final reply, report it
   if has_tool_calls {
     final_reply = "[Agent reached maximum tool-call turns without producing a final reply.]"
-    span.set_status(
-      @trace.Status::error(description=Some("max_tool_turns_reached")),
-    )
-  } else {
-    span.set_status(@trace.Status::ok())
+    @telemetry.set_turn_max_tool_turns_error(span)
   }
 
-  span.set_attribute(
-    @otel.KeyValue::new("agent.turn.actual_turns", Int64(turn.to_int64())),
-  )
-  span.set_attribute(
-    @otel.KeyValue::new(
-      "agent.turn.tool_call_count",
-      Int64(executed.length().to_int64()),
-    ),
-  )
-  span.set_attribute(
-    @otel.KeyValue::new("agent.turn.output", String(final_reply)),
-  )
-  span.end()
+  @telemetry.record_turn_metrics(span, turn, executed.length(), final_reply)
+  @telemetry.end_span_ok(span)
 
   { reply: final_reply, tool_calls: executed }
 }

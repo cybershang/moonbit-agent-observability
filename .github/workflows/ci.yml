@@ -39,6 +39,9 @@ jobs:
           moon info
           git diff --exit-code
 
+      - name: Test agent-telemetry library
+        run: moon test -p cybershang/agent-telemetry --target native
+
       - name: Check LLM_API_KEY secret
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}

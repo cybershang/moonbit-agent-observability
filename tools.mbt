@@ -2,26 +2,6 @@
 // agent-observability is licensed under Mulan PSL v2.
 
 ///|
-/// OpenTelemetry tracer for the ToolRouter module.
-let tools_tracer : Ref[@trace.Tracer?] = Ref(None)
-
-///|
-/// Get or create the ToolRouter tracer.
-fn get_tools_tracer() -> @trace.Tracer {
-  match tools_tracer.val {
-    Some(t) => t
-    None => {
-      let t = @otel.tracer(
-        "yingjie/agent-observability/tools",
-        version=Some("0.1.0"),
-      )
-      tools_tracer.val = Some(t)
-      t
-    }
-  }
-}
-
-///|
 /// Available tools for the LLM.
 pub let tools : Array[Tool] = [
   Tool::new(
@@ -58,39 +38,22 @@ pub async fn execute_tool(
   arguments : String,
   parent_context? : @context.Context = @context.Context::empty(),
 ) -> String {
-  let tracer = get_tools_tracer()
-  let builder = tracer
-    .span_builder("gen_ai.tool.execution")
-    .with_kind(@trace.Internal)
-    .with_attributes([
-      @otel.KeyValue::new("gen_ai.tool.name", String(name)),
-      @otel.KeyValue::new("gen_ai.tool.call.arguments", String(arguments)),
-    ])
-  let span = tracer.build_with_context(builder, parent_context)
+  let tracer = @telemetry.tracer("cybershang/agent-observability/tools")
+  let span = @telemetry.start_tool_span(
+    tracer,
+    name,
+    arguments,
+    parent_context~,
+  )
 
   let result = match name {
     "get_weather" => get_weather(arguments)
     "execute_command" => execute_command_tool(arguments)
-    _ => {
-      span.set_status(
-        @trace.Status::error(description=Some("Unknown tool: " + name)),
-      )
-      "{\"error\": \"Unknown tool: " + name + "\"}"
-    }
+    _ => "{\"error\": \"Unknown tool: " + name + "\"}"
   }
 
-  // Record whether the result indicates an error
-  if result.contains("\"error\"") {
-    span.set_status(
-      @trace.Status::error(description=Some("tool returned error")),
-    )
-  } else {
-    span.set_status(@trace.Status::ok())
-  }
-  span.set_attribute(
-    @otel.KeyValue::new("gen_ai.tool.call.result", String(result)),
-  )
-  span.end()
+  @telemetry.record_tool_result(span, result)
+  @telemetry.end_span(span)
 
   result
 }

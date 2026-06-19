@@ -1,4 +1,4 @@
-name = "cybershang/agent-observability"
+name = "cybershang/agent-telemetry"
 
 version = "0.1.0"
 
@@ -7,8 +7,8 @@ readme = "README.md"
 license = "MulanPSL-2.0"
 
 import {
-  "cybershang/agent-telemetry@0.1.0",
   "moonbitlang/async@0.19.2",
+  "moonbitlang/protobuf@0.1.1",
   "moonbitlang/x@0.1.0",
   "moonbit-community/opentelemetry@0.1.4",
 }

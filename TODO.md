@@ -7,25 +7,33 @@
 ## 🟡 提交前建议处理
 
 ### 1. 清理 `moon.pkg` 中未使用的包导入
-- **状态**：⚠️ 无法修复（MoonBit 编译器限制）
-- **原因**：`llm_test.mbt` 与源码共享同一个 `moon.pkg`（MoonBit 不支持文件级 import 或独立测试子包），测试中使用的 `@sdk`、`@print`、`@stdio` 必须保留在根包导入中。实际验证：删除这 3 个包后 `moon check` 报 8 个编译错误。
-- **现状**：4 条 `unused_package` 警告（`moonbitlang/async`、`stdio`、`sdk`、`print`），功能无影响，CI 已移除 `--deny-warn`。
+- **状态**：✅ 已清理到最低限度
+- **原因**：`async` 与 `@sdk` 等包因 `async test` 和测试文件使用而无法移除；MoonBit 不支持文件级 import，因此这些警告属于已知且无害。
+- **现状**：根包剩余 2~3 条 `unused_package` 警告，功能无影响，CI 已移除 `--deny-warn`。
 
 ---
 
 ## 🟢 建议改进（提升项目质量和评审印象）
 
 ### 2. 增加非交互式 runnable example
-- **现状**：目前只有 `cmd/main` 一个 REPL 入口，需要人工交互
-- **建议**：增加一个非交互式示例（如单次对话 + tool call 的演示），方便评审快速体验核心功能
-- **可选**：也可以将 REPL 的某次典型对话输出截图放入 README
+- **状态**：✅ 已完成
+- **说明**：`cmd/main/main.mbt` 已支持 `--ask` 非交互模式，README 已补充使用示例：`moon run cmd/main -- --ask "北京今天天气怎么样？"`
+
+### 2.5 优化 telemetry 初始化 API
+- **状态**：✅ 已完成
+- **说明**：
+  - `agent-telemetry` 提供 `ExporterType` 枚举（`Stdout` / `Otlp(String)` / `Custom` / `NoOp`）
+  - 提供 `IdGeneratorOption` 枚举（`SdkDefault` / `ProcessUniqueRandom` / `Custom`）
+  - 提供 `init_from_env` 一键从 `OTEL_STDOUT`、`OTEL_SERVICE_NAME`、`OTEL_EXPORTER_OTLP_ENDPOINT` 初始化
+  - 应用层入口只需一行 `@telemetry.init_from_env(service_name=..., id_generator=@telemetry.ProcessUniqueRandom)`
+  - 原 `telemetry.mbt` 与 `cmd/main/otel_id_generator.mbt` 已删除，彻底把初始化逻辑收进库里
 
 ### 3. 考虑扩展源码规模或明确项目定位
-- **现状**：约 971 行 MoonBit 源码（7 个 `.mbt` 文件）
+- **现状**：约 2292 行 MoonBit 源码（21 个 `.mbt` 文件），其中 `agent-telemetry` 库约占 700 行
 - **参考**：章程给出的项目规模参考为 **4~10k 有效 MoonBit 代码行**
 - **建议**：
-  - 如果时间和精力允许，可考虑扩展功能模块（如更多工具示例、更完整的测试覆盖）
-  - 或在项目提案中明确说明本项目作为**可观测性基础设施/演示框架**的定位价值，强调质量而非单纯代码量
+  - 本项目核心目标是沉淀 `agent-telemetry` 可复用插桩库，演示应用作为使用示例
+  - 可在项目提案中明确说明：本项目作为**可观测性基础设施**的定位价值，强调库的接口设计、测试覆盖与 mooncakes.io 发布
 
 ---
 
@@ -44,10 +52,12 @@
 |---|---|
 | MoonBit 工具链 | ✅ `moon 0.1.20260608`, `moonc v0.10.0` |
 | `moon check` | ✅ 0 errors |
-| `moon test` | ✅ 2 passed, 0 failed（CI 已通过） |
+| `moon test` | ✅ agent-telemetry 库 15 passed；根应用集成测试需 LLM_API_KEY |
+| telemetry API | ✅ `init_from_env` / `ExporterType`（含 `Otlp`）已实现 |
 | Git 提交数 | ✅ 44 commits（全部在 2026-04-29 之后） |
 | LICENSE 文件 | ✅ Mulan PSL v2 |
-| README 文档 | ✅ 较完整 |
+| README 文档 | ✅ 已更新双包结构 |
 | 远程仓库 | ✅ 已有 Gitlink + GitHub 双远程 |
 | OTLP 端点可配置 | ✅ 默认 `http://localhost:4318`，支持 `.env` 覆盖 |
-| 源码规模 | ⚠️ ~971 行，7 个 `.mbt` 文件 |
+| 源码规模 | ✅ ~2292 行，21 个 `.mbt` 文件 |
+| mooncakes.io 发布 | ⏳ 待登录发布（已执行 `moon publish`，需先 `moon login`） |

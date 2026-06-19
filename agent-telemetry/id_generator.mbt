@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Yingjie Shang
-// agent-observability is licensed under Mulan PSL v2.
+// agent-telemetry is licensed under Mulan PSL v2.
 
 ///|
 /// Per-process counter to keep seeds unique even if called multiple times.
@@ -40,6 +40,9 @@ async fn make_seed() -> Bytes {
 
 ///|
 /// Create an IdGenerator with a process-unique seed.
+///
+/// This helper works around the SDK default RandomIdGenerator's fixed ChaCha8
+/// seed, which produces duplicate trace/span IDs across process restarts.
 pub async fn make_random_id_generator() -> @sdktrace.IdGenerator {
   let seed = make_seed()
   let random = @random.Rand::chacha8(seed~)

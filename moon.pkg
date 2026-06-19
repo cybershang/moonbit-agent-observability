@@ -1,4 +1,5 @@
 import {
+  "cybershang/agent-telemetry" @telemetry,
   "moonbitlang/async",
   "moonbitlang/async/http",
   "moonbitlang/async/fs",
@@ -8,14 +9,7 @@ import {
   "moonbitlang/core/env",
   "moonbitlang/core/json",
   "moonbitlang/core/string",
-  "moonbit-community/opentelemetry" @otel,
-  "moonbit-community/opentelemetry/interface/common",
   "moonbit-community/opentelemetry/interface/context",
-  "moonbit-community/opentelemetry/interface/trace",
-  "moonbit-community/opentelemetry/otlp",
   "moonbit-community/opentelemetry/print",
   "moonbit-community/opentelemetry/sdk",
-  "moonbit-community/opentelemetry/sdk/resource",
-  "moonbit-community/opentelemetry/sdk/trace" @sdktrace,
-  "moonbit-community/opentelemetry/semantics/trace" @semtrace,
 }
