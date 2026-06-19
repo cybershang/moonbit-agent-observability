@@ -60,4 +60,4 @@
 | 远程仓库 | ✅ 已有 Gitlink + GitHub 双远程 |
 | OTLP 端点可配置 | ✅ 默认 `http://localhost:4318`，支持 `.env` 覆盖 |
 | 源码规模 | ✅ ~2292 行，21 个 `.mbt` 文件 |
-| mooncakes.io 发布 | ⏳ 待登录发布（已执行 `moon publish`，需先 `moon login`） |
+| mooncakes.io 发布 | ✅ 已发布 `cybershang/agent-telemetry@0.0.1` |
