@@ -91,6 +91,22 @@ moon test -p cybershang/agent-telemetry --target native
 - 当 MoonBit 报某个依赖包的类型/函数“找不到”，但该函数确实存在于源码时，优先检查 **目标后端是否匹配**。很多 `async` 子包的 API 是 native-only。
 - 库的 `moon.mod` 里应显式声明 `preferred_target = "native"`，否则被应用引用时也可能因为编译上下文不同而暴露问题。
 
+## 同步 agent-telemetry 到独立仓库
+
+`agent-telemetry` 已作为 `moonbit-agent-observability` 的子目录维护，同时通过 `git subtree` 同步到 <https://github.com/cybershang/agent-telemetry>。
+
+每次修改 `agent-telemetry/` 后，运行：
+
+```bash
+./scripts/sync-agent-telemetry.sh
+```
+
+或手动执行：
+
+```bash
+git subtree push --prefix=agent-telemetry agent-telemetry main
+```
+
 ## 相关改动
 
 - `agent-telemetry/moon.mod`：新增 `preferred_target = "native"`
