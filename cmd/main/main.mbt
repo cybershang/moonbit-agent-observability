@@ -26,9 +26,8 @@ async fn main {
       // Non-interactive mode: run a single turn and exit.
       let turn = agent.run(query)
       print_turn(turn)
-      // Swallow export errors so a missing collector does not fail the run.
-      let _ = provider.force_flush() catch { _ => Ok(()) }
-      let _ = provider.shutdown() catch { _ => Ok(()) }
+      flush_provider(provider)
+      shutdown_provider(provider)
     }
     None => {
       // REPL with continuous dialogue
@@ -48,12 +47,48 @@ async fn main {
         // Ensure spans are flushed to the OTLP collector after each turn.
         // This is especially important for the batch exporter so telemetry
         // is not lost when the process exits shortly after the loop.
-        ignore(provider.force_flush())
+        flush_provider(provider)
       }
 
       // Gracefully shut down the tracer provider so pending spans are exported.
-      ignore(provider.shutdown())
+      shutdown_provider(provider)
     }
+  }
+}
+
+///|
+/// Format an OpenTelemetry SDK error for user-visible logging.
+fn format_otel_error(err : @error.OTelSdkError) -> String {
+  match err {
+    AlreadyShutdown => "AlreadyShutdown"
+    Timeout(ms) => "Timeout(\{ms}ms)"
+    InvalidArgument(msg) => "InvalidArgument(\{msg})"
+    InternalFailure(msg) => "InternalFailure(\{msg})"
+    ExportFailure(name, msg) => "ExportFailure(\{name}, \{msg})"
+  }
+}
+
+///|
+/// Flush the provider and print any export error so telemetry issues are visible.
+async fn flush_provider(provider : @sdktrace.SdkTracerProvider) -> Unit {
+  match provider.force_flush() {
+    Ok(_) => ()
+    Err(err) =>
+      @stdio.stdout.write(
+        "[Telemetry] force_flush failed: " + format_otel_error(err) + "\n",
+      )
+  }
+}
+
+///|
+/// Shut down the provider and print any export error.
+async fn shutdown_provider(provider : @sdktrace.SdkTracerProvider) -> Unit {
+  match provider.shutdown() {
+    Ok(_) => ()
+    Err(err) =>
+      @stdio.stdout.write(
+        "[Telemetry] shutdown failed: " + format_otel_error(err) + "\n",
+      )
   }
 }
 
