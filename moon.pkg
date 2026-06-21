@@ -1,16 +1,22 @@
 import {
   "cybershang/agent-telemetry" @telemetry,
-  "moonbitlang/async",
   "moonbitlang/async/http",
   "moonbitlang/async/fs",
   "moonbitlang/async/process",
-  "moonbitlang/async/stdio",
   "moonbitlang/core/debug",
   "moonbitlang/core/env",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/json",
   "moonbitlang/core/string",
   "moonbit-community/opentelemetry/interface/context",
+}
+
+import {
+  "moonbitlang/async",
   "moonbit-community/opentelemetry/print",
   "moonbit-community/opentelemetry/sdk",
-}
+} for "test"
+
+import {
+  "moonbitlang/async",
+} for "wbtest"
