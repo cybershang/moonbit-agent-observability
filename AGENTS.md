@@ -38,11 +38,28 @@ agent-observability/
 │       ├── moon.pkg            # 可执行包配置（is-main: true）
 │       ├── main.mbt            # 入口：REPL 主循环
 │       └── otel_id_generator.mbt  # 进程唯一的随机 Trace/Span ID 生成器
+├── agent-telemetry/            # 内嵌的 OpenTelemetry 插桩库（独立模块 cybershang/agent-telemetry）
+│   ├── lib.mbt                 # provider / tracer / span 生命周期辅助函数
+│   ├── agent.mbt               # agent.turn span 辅助函数
+│   ├── genai.mbt               # GenAI 语义约定 span 辅助函数
+│   ├── tool.mbt                # tool execution span 辅助函数
+│   └── ...
 ├── agent_implementation_prompt.md  # 设计规格说明书（中文）
 ├── README.md                   # 项目说明
 ├── .env                        # 环境变量（LLM_API_KEY、OTEL_EXPORTER_OTLP_ENDPOINT 等）
 └── .mooncakes/                 # moon 下载的外部依赖缓存
 ```
+
+## 双库开发模式
+
+本项目采用**双库同仓开发**：
+
+- **Agent 应用**在 `agent-observability/` 根目录下开发，模块名为 `cybershang/agent-observability`。
+- **插桩库**在 `agent-observability/agent-telemetry/` 子目录下开发，模块名为 `cybershang/agent-telemetry`。
+
+`agent-observability` 通过 `moon.mod` 依赖 `cybershang/agent-telemetry`。本地开发时，子目录 `agent-telemetry/` 作为工作区成员被优先使用；发布时，子目录中的模块单独发布到 mooncakes.io，版本号由它自己的 `agent-telemetry/moon.mod` 决定。
+
+发布 `agent-telemetry` 时，在**独立的 GitHub 仓库** `cybershang/agent-telemetry` 中打 tag 触发 publish action，而不是在 `agent-observability` 仓库中打 tag。
 
 ## 构建与测试
 
@@ -117,12 +134,20 @@ MoonBit 目前不支持：
 
 ## 远程仓库
 
-本项目同时托管在 Gitlink（大赛要求）和 GitHub 上：
+### agent-observability（Agent 应用）
 
 | 名称 | 地址 |
 |---|---|
-| `origin` | `git@code.gitlink.org.cn:yingjie/agent-observability.git` |
+| `origin` (Gitlink) | `git@code.gitlink.org.cn:yingjie/agent-observability.git` |
 | `github` | `git@github.com:cybershang/moonbit-agent-observability.git` |
+
+### agent-telemetry（插桩库）
+
+| 名称 | 地址 |
+|---|---|
+| `github` | `git@github.com:cybershang/agent-telemetry.git` |
+
+`agent-telemetry` 的发布在独立仓库 `cybershang/agent-telemetry` 中进行，通过 push tag `v*` 触发 `.github/workflows/publish.yml` 发布到 mooncakes.io。
 
 ### 日常推送命令
 
