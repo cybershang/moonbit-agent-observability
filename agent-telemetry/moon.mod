@@ -1,6 +1,6 @@
 name = "cybershang/agent-telemetry"
 
-version = "0.1.2"
+version = "0.1.4"
 
 readme = "README.md"
 
