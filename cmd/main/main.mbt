@@ -42,13 +42,13 @@ async fn main {
           break
         }
 
+        let turn = agent.run(prompt)
+        print_turn(turn)
+
         // Ensure spans are flushed to the OTLP collector after each turn.
         // This is especially important for the batch exporter so telemetry
         // is not lost when the process exits shortly after the loop.
         ignore(provider.force_flush())
-
-        let turn = agent.run(prompt)
-        print_turn(turn)
       }
 
       // Gracefully shut down the tracer provider so pending spans are exported.
