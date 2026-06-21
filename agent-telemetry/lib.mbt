@@ -136,11 +136,13 @@ async fn do_init_telemetry(
 ) -> @sdktrace.SdkTracerProvider {
   let id_generator = resolve_id_generator(id_generator)
   let exporter = match build_exporter(exporter_type) {
-    Some(exporter) => exporter
-    None =>
-      abort(
-        "Telemetry exporter could not be built; check OTEL_EXPORTER_OTLP_ENDPOINT and OTEL_STDOUT.",
+    Some(exporter) => safe_exporter(exporter)
+    None => {
+      @stdio.stdout.write(
+        "[Telemetry] Exporter could not be created; telemetry will be disabled. Continuing without telemetry.\n",
       )
+      noop_exporter()
+    }
   }
   let resource = build_resource(config.service_name)
   let batch_config = @sdktrace.BatchConfig::new(
@@ -159,6 +161,61 @@ async fn do_init_telemetry(
 }
 
 ///| Internal helpers
+
+///|
+/// Build a no-op span exporter that silently discards all spans.
+fn noop_exporter() -> @sdktrace.SpanExporter {
+  @sdktrace.SpanExporter::new(
+    fn(_batch) { @error.ok() },
+    force_flush_fn=fn() { @error.ok() },
+    shutdown_fn=fn() { @error.ok() },
+    name_fn=() => "noop",
+  )
+}
+
+///|
+/// Wrap a span exporter so that export/flush/shutdown errors are turned into
+/// `ExportFailure` results instead of being raised. This keeps OTLP network
+/// failures (e.g. "Connection refused") from crashing the application.
+fn safe_exporter(inner : @sdktrace.SpanExporter) -> @sdktrace.SpanExporter {
+  let name = inner.name()
+  @sdktrace.SpanExporter::new(
+    async fn(batch) {
+      inner.export_batch(batch) catch {
+        err =>
+          @error.export_failure(
+            name,
+            "export failed: " + format_telemetry_error(err),
+          )
+      }
+    },
+    force_flush_fn=async fn() {
+      inner.force_flush() catch {
+        err =>
+          @error.export_failure(
+            name,
+            "force_flush failed: " + format_telemetry_error(err),
+          )
+      }
+    },
+    shutdown_fn=async fn() {
+      inner.shutdown() catch {
+        err =>
+          @error.export_failure(
+            name,
+            "shutdown failed: " + format_telemetry_error(err),
+          )
+      }
+    },
+    name_fn=() => name,
+  )
+}
+
+///|
+/// Format an arbitrary error for telemetry diagnostics.
+fn format_telemetry_error(err : Error) -> String {
+  err.to_string()
+}
 
 ///|
 /// Append the OTLP/HTTP traces signal path if the endpoint is a base URL.
@@ -197,7 +254,11 @@ async fn build_exporter(
               "UnsupportedCompressionAlgorithm(\{a})"
           }
           @stdio.stdout.write(
-            "Failed to build OTLP exporter: " + err_text + "\n",
+            "[Telemetry] Failed to build OTLP exporter for endpoint " +
+            endpoint +
+            ": " +
+            err_text +
+            ". Telemetry will be disabled.\n",
           )
           None
         }

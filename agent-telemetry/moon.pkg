@@ -13,6 +13,7 @@ import {
   "moonbit-community/opentelemetry/otlp",
   "moonbit-community/opentelemetry/print",
   "moonbit-community/opentelemetry/sdk",
+  "moonbit-community/opentelemetry/sdk/error",
   "moonbit-community/opentelemetry/sdk/resource",
   "moonbit-community/opentelemetry/sdk/trace" @sdktrace,
   "moonbit-community/opentelemetry/semantics/trace" @semtrace,
@@ -21,3 +22,7 @@ import {
 import {
   "moonbitlang/async",
 } for "test"
+
+import {
+  "moonbitlang/async",
+} for "wbtest"

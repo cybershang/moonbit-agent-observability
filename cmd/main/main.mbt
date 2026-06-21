@@ -69,14 +69,39 @@ fn format_otel_error(err : @error.OTelSdkError) -> String {
 }
 
 ///|
+/// Check whether an OTLP error is caused by the collector being unreachable.
+fn is_connection_failure(err : @error.OTelSdkError) -> Bool {
+  let text = format_otel_error(err).to_lower()
+  text.contains("connection refused") ||
+  text.contains("connection reset") ||
+  text.contains("timeout") ||
+  text.contains("oserror")
+}
+
+///|
+/// Return a friendly hint for common OTLP export failures.
+fn otlp_failure_hint(err : @error.OTelSdkError) -> String {
+  if is_connection_failure(err) {
+    "Hint: the OTLP endpoint is unreachable. Check OTEL_EXPORTER_OTLP_ENDPOINT or start the OpenTelemetry collector. Telemetry spans will be discarded, but the agent will continue running."
+  } else {
+    ""
+  }
+}
+
+///|
 /// Flush the provider and print any export error so telemetry issues are visible.
 async fn flush_provider(provider : @sdktrace.SdkTracerProvider) -> Unit {
   match provider.force_flush() {
     Ok(_) => ()
-    Err(err) =>
+    Err(err) => {
       @stdio.stdout.write(
         "[Telemetry] force_flush failed: " + format_otel_error(err) + "\n",
       )
+      let hint = otlp_failure_hint(err)
+      if hint != "" {
+        @stdio.stdout.write("[Telemetry] " + hint + "\n")
+      }
+    }
   }
 }
 
@@ -85,10 +110,15 @@ async fn flush_provider(provider : @sdktrace.SdkTracerProvider) -> Unit {
 async fn shutdown_provider(provider : @sdktrace.SdkTracerProvider) -> Unit {
   match provider.shutdown() {
     Ok(_) => ()
-    Err(err) =>
+    Err(err) => {
       @stdio.stdout.write(
         "[Telemetry] shutdown failed: " + format_otel_error(err) + "\n",
       )
+      let hint = otlp_failure_hint(err)
+      if hint != "" {
+        @stdio.stdout.write("[Telemetry] " + hint + "\n")
+      }
+    }
   }
 }
 
