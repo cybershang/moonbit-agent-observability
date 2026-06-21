@@ -7,7 +7,7 @@ readme = "README.md"
 license = "MulanPSL-2.0"
 
 import {
-  "cybershang/agent-telemetry@0.1.2",
+  "cybershang/agent-telemetry@0.1.3",
   "moonbitlang/async@0.19.2",
   "moonbit-community/opentelemetry@0.1.4",
 }
