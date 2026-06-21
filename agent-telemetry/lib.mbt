@@ -53,7 +53,7 @@ pub async fn init_telemetry(
   exporter_type : ExporterType,
   id_generator? : IdGeneratorOption = SdkDefault,
 ) -> @sdktrace.SdkTracerProvider {
-  do_init_telemetry(config, exporter_type, id_generator=id_generator)
+  do_init_telemetry(config, exporter_type, id_generator~)
 }
 
 ///|
@@ -76,19 +76,17 @@ pub async fn init_from_env(
   let otel_endpoint = @env.get_env_var("OTEL_EXPORTER_OTLP_ENDPOINT").unwrap_or(
     "http://localhost:4318",
   )
-  let exporter_type = if otel_stdout {
-    Stdout
-  } else {
-    Otlp(otel_endpoint)
-  }
-  do_init_telemetry(config, exporter_type, id_generator=id_generator)
+  let exporter_type = if otel_stdout { Stdout } else { Otlp(otel_endpoint) }
+  do_init_telemetry(config, exporter_type, id_generator~)
 }
 
 ///| Internal helpers
 
 ///|
 /// Resolve an IdGeneratorOption into a concrete IdGenerator.
-async fn resolve_id_generator(option : IdGeneratorOption) -> @sdktrace.IdGenerator {
+async fn resolve_id_generator(
+  option : IdGeneratorOption,
+) -> @sdktrace.IdGenerator {
   match option {
     SdkDefault => @sdktrace.RandomIdGenerator::new().into_id_generator()
     ProcessUniqueRandom => make_random_id_generator()
@@ -104,7 +102,13 @@ async fn do_init_telemetry(
   id_generator? : IdGeneratorOption = SdkDefault,
 ) -> @sdktrace.SdkTracerProvider {
   let id_generator = resolve_id_generator(id_generator)
-  let exporter = build_exporter(exporter_type)
+  let exporter = match build_exporter(exporter_type) {
+    Some(exporter) => exporter
+    None =>
+      abort(
+        "Telemetry exporter could not be built; check OTEL_EXPORTER_OTLP_ENDPOINT and OTEL_STDOUT.",
+      )
+  }
   let resource = build_resource(config.service_name)
   let batch_config = @sdktrace.BatchConfig::new(
     max_queue_size=64,
@@ -112,14 +116,11 @@ async fn do_init_telemetry(
     scheduled_delay_millis=1000,
     export_timeout_millis=5000,
   )
-  let builder = @sdk.tracer_provider_builder()
+  let provider = @sdk.tracer_provider_builder()
     .with_resource(resource)
     .with_id_generator(id_generator)
-  let provider = match exporter {
-    Some(exporter) =>
-      builder.with_batch_exporter(exporter, config=batch_config).build()
-    None => builder.build()
-  }
+    .with_batch_exporter(exporter, config=batch_config)
+    .build()
   @sdk.set_tracer_provider(provider)
   provider
 }
@@ -127,13 +128,33 @@ async fn do_init_telemetry(
 ///| Internal helpers
 
 ///|
+/// Append the OTLP/HTTP traces signal path if the endpoint is a base URL.
+///
+/// The `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable is defined as a
+/// base URL; the SDK expects the signal path (`/v1/traces`) to be added.
+/// If the endpoint already ends with `/v1/traces`, it is returned unchanged.
+fn normalize_trace_endpoint(endpoint : String) -> String {
+  let trimmed = endpoint.trim_end(chars="/").to_owned()
+  if trimmed.has_suffix("/v1/traces") {
+    trimmed
+  } else {
+    trimmed + "/v1/traces"
+  }
+}
+
+///|
 /// Build a span exporter from the requested exporter type.
-async fn build_exporter(exporter_type : ExporterType) -> @sdktrace.SpanExporter? {
+async fn build_exporter(
+  exporter_type : ExporterType,
+) -> @sdktrace.SpanExporter? {
   match exporter_type {
     Stdout => Some(@print.SpanExporter::new().into_span_exporter())
     Otlp(endpoint) =>
       match
-        @otlp.SpanExporter::builder().with_http().with_endpoint(endpoint).build() {
+        @otlp.SpanExporter::builder()
+        .with_http()
+        .with_endpoint(normalize_trace_endpoint(endpoint))
+        .build() {
         Ok(exporter) => Some(exporter.into_span_exporter())
         Err(err) => {
           let err_text = match err {
