@@ -1,10 +1,10 @@
 name = "cybershang/agent-telemetry"
 
-version = "0.0.2"
+version = "0.1.2"
 
 readme = "README.md"
 
-repository = "https://github.com/cybershang/agent-telemetry"
+repository = "https://github.com/cybershang/moonbit-agent-observability"
 
 license = "MulanPSL-2.0"
 
