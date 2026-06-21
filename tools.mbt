@@ -1,35 +1,64 @@
 // Copyright (c) 2026 Yingjie Shang
 // agent-observability is licensed under Mulan PSL v2.
 
+///| Tool registry
+
 ///|
-/// Available tools for the LLM.
-pub let tools : Array[Tool] = [
-  Tool::new(
-    name="get_weather",
-    description="获取指定城市的当前天气",
-    parameters={
-      "type": "object",
-      "properties": {
-        "city": { "type": "string", "description": "城市名称" },
-      },
-      "required": ["city"],
-    },
-  ),
-  Tool::new(
-    name="execute_command",
-    description="在系统 shell 中执行命令，返回标准输出。注意：只能执行安全的只读命令（如 ls, cat, echo, pwd 等），禁止执行会修改系统的命令（如 rm, mv, write 等）。",
-    parameters={
-      "type": "object",
-      "properties": {
-        "command": {
-          "type": "string",
-          "description": "要执行的 shell 命令（例如: ls -la）",
+/// A tool handler takes a JSON arguments string and returns a result string.
+pub type ToolHandler = async (String) -> String
+
+///|
+/// A tool definition bundled with its runtime handler.
+pub struct RegisteredTool {
+  tool : Tool
+  handler : ToolHandler
+}
+
+///|
+/// Single source of truth for all available tools.
+let registered_tools : Array[RegisteredTool] = [
+  {
+    tool: Tool::new(
+      name="get_weather",
+      description="Get the current weather for a specified city.",
+      parameters={
+        "type": "object",
+        "properties": {
+          "city": { "type": "string", "description": "City name" },
         },
+        "required": ["city"],
       },
-      "required": ["command"],
-    },
-  ),
+    ),
+    handler: fn(args : String) -> String { get_weather(args) },
+  },
+  {
+    tool: Tool::new(
+      name="execute_command",
+      description="Execute a command in the system shell and return stdout. Only safe read-only commands (e.g. ls, cat, echo, pwd) are allowed; commands that modify the system (e.g. rm, mv, cp, write) are forbidden.",
+      parameters={
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "The shell command to execute (e.g. ls -la)",
+          },
+        },
+        "required": ["command"],
+      },
+    ),
+    handler: execute_command_tool,
+  },
 ]
+
+///|
+/// Tool definitions exposed to the LLM.
+pub let tools : Array[Tool] = registered_tools.map(fn(r) { r.tool })
+
+///|
+/// Registry mapping tool names to their handlers.
+let tool_registry : Map[String, ToolHandler] = Map::from_array(
+  registered_tools.map(fn(r) { (r.tool.name, r.handler) }),
+)
 
 ///|
 /// Execute a tool by name with JSON arguments.
@@ -46,10 +75,9 @@ pub async fn execute_tool(
     parent_context~,
   )
 
-  let result = match name {
-    "get_weather" => get_weather(arguments)
-    "execute_command" => execute_command_tool(arguments)
-    _ => "{\"error\": \"Unknown tool: " + name + "\"}"
+  let result = match tool_registry.get(name) {
+    Some(handler) => handler(arguments)
+    None => "{\"error\": \"Unknown tool: " + name + "\"}"
   }
 
   @telemetry.record_tool_result(span, result)

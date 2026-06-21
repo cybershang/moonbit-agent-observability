@@ -31,7 +31,7 @@ test "get_weather tool has correct schema" {
       #|"get_weather"
     ),
   )
-  assert_true(tool.description.contains("天气"))
+  assert_true(tool.description.contains("weather"))
   let params = tool.parameters.stringify()
   assert_true(params.contains("\"city\""))
   assert_true(params.contains("\"required\""))
