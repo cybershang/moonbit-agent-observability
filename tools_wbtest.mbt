@@ -125,3 +125,13 @@ test "escape_json - unicode characters preserved" {
     ),
   )
 }
+
+///|
+async test "execute_command handles non-utf8 stdout" {
+  let result = execute_command_tool(
+    "{\"command\": \"printf '\\\\xFF\\\\xFE'\"}",
+  )
+  // Should not crash on non-UTF-8 output; result contains replacement chars or
+  // the command output in some form.
+  assert_true(result.contains("exit_code"))
+}

@@ -114,9 +114,10 @@ async fn execute_command_tool(args_json : String) -> String {
       return "{\"error\": \"Forbidden command: " + bad + "\"}"
     }
   }
-  // Run command and collect output
+  // Run command and collect output. Use lossy UTF-8 decoding so commands that
+  // emit binary data (e.g. `cat` on a non-text file) do not crash the agent.
   let (code, stdout, _stderr) = @process.collect_output("sh", ["-c", command])
-  let output = stdout.text()
+  let output = @utf8.decode_lossy(stdout.binary())
   "{\"exit_code\": " +
   code.to_string() +
   ", \"output\": \"" +
