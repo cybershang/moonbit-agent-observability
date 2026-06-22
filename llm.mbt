@@ -140,6 +140,22 @@ pub async fn Client::chat(
     parent_context~,
   )
 
+  @telemetry.set_bool_attribute(
+    span,
+    "app.llm.capture_content",
+    self.capture_content,
+  )
+  @telemetry.set_bool_attribute(
+    span,
+    "app.llm.tools_enabled",
+    !tools.is_empty(),
+  )
+  @telemetry.set_int_attribute(
+    span,
+    "app.llm.messages.count",
+    messages.length().to_int64(),
+  )
+
   let body_json = build_request_json(
     messages,
     tools,

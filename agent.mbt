@@ -56,6 +56,17 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
   )
   let parent_context = span.context()
 
+  @telemetry.set_int_attribute(
+    span,
+    "app.conversation.history_messages",
+    self.messages.length().to_int64(),
+  )
+  @telemetry.set_int_attribute(
+    span,
+    "app.agent.tool_count",
+    self.tools.length().to_int64(),
+  )
+
   self.messages.push(Message::new(content=Some(prompt)))
 
   let mut turn = 0

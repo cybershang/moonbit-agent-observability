@@ -36,8 +36,24 @@ async fn main {
         // REPL with continuous dialogue
         while true {
           @stdio.stdout.write("> ")
-          let prompt = match @stdio.stdin.read_until("\n") {
-            Some(line) => line.trim(char_set="\r\n").to_owned()
+          // read_until throws utf8.Malformed when stdin contains bytes that
+          // aren't valid UTF-8 (e.g. terminal escape sequences after
+          // backspacing over the prompt, or IME composition artifacts).
+          // Catch the error, drain the internal buffer, and retry.
+          let input = @stdio.stdin.read_until("\n") catch {
+            _ => {
+              let _ = @stdio.stdin.read_some()
+              continue
+            }
+          }
+          let prompt = match input {
+            Some(line) => {
+              let trimmed = line.trim(char_set="\r\n").to_owned()
+              if trimmed.is_empty() {
+                continue
+              }
+              trimmed
+            }
             None => break
           }
           if prompt == "exit" || prompt == "quit" {

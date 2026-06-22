@@ -128,6 +128,22 @@ let span = @telemetry.start_span(tracer, "my.step")
 
 `set_json_attribute` serializes the `Json` value to a string attribute, which is convenient for structured metadata that does not fit the scalar attribute types. If you already have an array of `@otel.KeyValue` values, use `set_attributes(span, attrs)` directly.
 
+### Example: application-specific attributes in this sample app
+
+The `agent-observability` sample application records a small set of `app.*` attributes on top of the standard GenAI ones. Each `Agent::run` invocation starts its own root `agent.turn` span, so every turn is an independent trace; the attributes below live on that turn and its children:
+
+| Span | Attribute | Type | Meaning |
+|---|---|---|---|
+| `agent.turn` | `app.conversation.history_messages` | int64 | History length before this turn |
+| `agent.turn` | `app.agent.tool_count` | int64 | Tools available to the agent |
+| `gen_ai.chat` | `app.llm.capture_content` | bool | Whether this client captures content |
+| `gen_ai.chat` | `app.llm.tools_enabled` | bool | Whether tools were sent in the request |
+| `gen_ai.chat` | `app.llm.messages.count` | int64 | Number of messages in the request |
+| `gen_ai.tool.execution` | `app.tool.arguments_length` | int64 | Length of the JSON arguments string |
+| `gen_ai.tool.execution` | `app.tool.unknown` | bool | Whether the requested tool is unknown |
+
+These attributes are set with the typed helpers shown above, so they are easy to query in GreptimeDB / Grafana alongside the built-in GenAI attributes.
+
 ## Recording Metrics
 
 Get a `Meter` for your scope and call the semantic metric functions:
