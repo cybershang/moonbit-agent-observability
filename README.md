@@ -50,7 +50,7 @@ flowchart TD
     end
 
     subgraph Tools["🛠️ External Tools"]
-        TW["🌤️ get_weather（mock）"]
+        TW["🌤️ get_weather / lookup_city（QWeather）"]
         TC["💻 execute_command（安全受限）"]
     end
 
@@ -106,8 +106,11 @@ cp .env.example .env
 | `AGENT_MAX_TOOL_TURNS` | Agent 自动 tool call 最大轮数 | `10` |
 | `OTEL_STDOUT` | 是否输出 OTel trace 到 stdout | `false` |
 | `CAPTURE_CONTENT` | 是否在 span 中采集用户/助手消息内容 | `false` |
+| `QWEATHER_TOKEN` | 和风天气 JWT Token（新 Platform API） | 必填 |
+| `QWEATHER_API_KEY` | 和风天气旧版 Web API Key（作为 `QWEATHER_TOKEN` 的 fallback） | - |
+| `QWEATHER_API_HOST` | 和风天气 API 主机，标准订阅用 `https://api.qweather.com`，开发版用 `https://devapi.qweather.com` | `https://devapi.qweather.com` |
 
-所有配置在运行时被加载到 `Settings` 结构体中，随后传递给 `Client` 与 `Agent`，避免在业务代码中散落环境变量读取逻辑。
+所有配置在运行时被加载到 `Settings` 结构体中，随后传递给 `Client` 与 `Agent`，避免在业务代码中散落环境变量读取逻辑。`QWEATHER_*` 配置由 `tools.mbt` 在工具执行时读取。
 
 ### 运行
 

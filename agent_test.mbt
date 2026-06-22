@@ -28,11 +28,15 @@ async test "Agent end-to-end smoke test with weather tool call" {
   // Run a prompt that should trigger the get_weather tool.
   let turn = agent.run("北京今天天气怎么样？")
 
-  // Verify the agent actually used the tool.
+  // Verify the agent actually used the weather tools.
   assert_true(turn.tool_calls.length() > 0)
-  let first_call = turn.tool_calls[0].call
-  assert_true(first_call.name == "get_weather")
-  assert_true(first_call.arguments.contains("北京"))
+  let weather_calls = turn.tool_calls.filter(fn(r) {
+    r.call.name == "get_weather" || r.call.name == "lookup_city"
+  })
+  assert_true(weather_calls.length() > 0)
+  assert_true(
+    weather_calls.any(fn(r) { r.call.name == "lookup_city" && r.call.arguments.contains("北京") }),
+  )
 
   // Verify a final text reply was produced.
   assert_true(turn.reply.length() > 0)

@@ -6,25 +6,40 @@
 // ============================================================================
 
 ///|
-test "get_weather returns valid JSON" {
-  let result = get_weather("{\"city\":\"Beijing\"}")
-  assert_true(result.contains("\"temperature\""))
-  assert_true(result.contains("\"condition\""))
-  assert_true(result.contains("晴"))
+async test "get_weather reports missing credentials when none configured" {
+  // If credentials are present in the environment, skip the missing-credential
+  // path to avoid making a real API call in this unit test.
+  if qweather_configured() {
+    return
+  }
+  let result = get_weather("{\"location_id\":\"101010100\"}")
+  assert_true(result.contains("\"error\""))
+  assert_true(result.contains("QWEATHER_TOKEN"))
 }
 
 ///|
-test "get_weather ignores arguments" {
-  // get_weather is a mock that ignores all arguments
-  let result1 = get_weather("{}")
-  let result2 = get_weather("{\"city\":\"Shanghai\"}")
-  debug_inspect(
-    result1,
-    content=(
-      #|"{\"temperature\": 25, \"condition\": \"晴\"}"
-    ),
-  )
-  ignore(result2)
+async test "lookup_city reports missing credentials when none configured" {
+  if qweather_configured() {
+    return
+  }
+  let result = lookup_city("{\"query\":\"Beijing\"}")
+  assert_true(result.contains("\"error\""))
+  assert_true(result.contains("QWEATHER_TOKEN"))
+}
+
+///|
+test "url_encode - ascii alphanumeric preserved" {
+  debug_inspect(url_encode("HelloWorld123"), content="\"HelloWorld123\"")
+}
+
+///|
+test "url_encode - spaces and special chars" {
+  debug_inspect(url_encode("a b+c"), content="\"a%20b%2Bc\"")
+}
+
+///|
+test "url_encode - chinese characters" {
+  debug_inspect(url_encode("北京"), content="\"%E5%8C%97%E4%BA%AC\"")
 }
 
 ///|
