@@ -1164,7 +1164,7 @@
     },
     {
       "type": "row",
-      "title": "Traces",
+      "title": "System Logs",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1175,12 +1175,76 @@
     },
     {
       "type": "table",
-      "title": "Recent Traces",
+      "title": "Recent System Logs",
+      "description": "General application logs written to opentelemetry_logs.",
       "gridPos": {
         "h": 8,
         "w": 24,
         "x": 0,
         "y": 71
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_GREPTIMEDB}"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "rawSql": "SELECT timestamp AS time, body FROM opentelemetry_logs WHERE $__timeFilter(timestamp) ORDER BY timestamp DESC LIMIT 100",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "body"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 800
+              },
+              {
+                "id": "custom.inspect",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "time",
+            "desc": true
+          }
+        ]
+      }
+    },
+    {
+      "type": "row",
+      "title": "Traces",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 79
+      },
+      "collapsed": false
+    },
+    {
+      "type": "table",
+      "title": "Recent Traces",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 80
       },
       "datasource": {
         "type": "mysql",
@@ -1278,7 +1342,7 @@
         "h": 14,
         "w": 24,
         "x": 0,
-        "y": 79
+        "y": 88
       },
       "datasource": {
         "type": "info8fcc-greptimedb-datasource",
