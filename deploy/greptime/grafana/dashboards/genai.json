@@ -1288,7 +1288,7 @@
         {
           "refId": "Trace ID",
           "editorType": "code",
-          "rawSql": "SELECT trace_id, span_id, parent_span_id, service_name, span_name, CAST(timestamp AS INT64) / 1000000 as ts_ms, CAST(duration_nano AS FLOAT64) / 1000000 as dur_ms, json_to_string(span_events) as span_events, \"span_attributes.gen_ai.provider.name\", \"span_attributes.gen_ai.operation.name\", \"span_attributes.gen_ai.request.model\", \"span_attributes.gen_ai.request.max_tokens\", \"span_attributes.server.address\", span_status_code, \"resource_attributes.telemetry.sdk.name\", \"resource_attributes.telemetry.sdk.language\", \"resource_attributes.telemetry.sdk.version\" FROM opentelemetry_traces WHERE timestamp >= $__fromTime AND timestamp <= $__toTime AND trace_id = COALESCE(NULLIF(${trace_id:sqlstring}, ''), (SELECT trace_id FROM opentelemetry_traces WHERE timestamp >= $__fromTime AND timestamp <= $__toTime ORDER BY timestamp DESC LIMIT 1)) ORDER BY timestamp",
+          "rawSql": "SELECT trace_id, span_id, parent_span_id, service_name, span_name, CAST(timestamp AS INT64) / 1000000 as ts_ms, CAST(duration_nano AS FLOAT64) / 1000000 as dur_ms, json_to_string(span_events) as span_events, \"span_attributes.gen_ai.provider.name\", \"span_attributes.gen_ai.operation.name\", \"span_attributes.gen_ai.request.model\", \"span_attributes.gen_ai.request.max_tokens\", \"span_attributes.server.address\", span_status_code, \"span_attributes.gen_ai.input.messages\", \"span_attributes.gen_ai.output.messages\", \"span_attributes.gen_ai.tool.name\", \"span_attributes.gen_ai.tool.call.arguments\", \"span_attributes.gen_ai.tool.call.result\", \"resource_attributes.telemetry.sdk.name\", \"resource_attributes.telemetry.sdk.language\", \"resource_attributes.telemetry.sdk.version\" FROM opentelemetry_traces WHERE timestamp >= $__fromTime AND timestamp <= $__toTime AND trace_id = COALESCE(NULLIF(${trace_id:sqlstring}, ''), (SELECT trace_id FROM opentelemetry_traces WHERE timestamp >= $__fromTime AND timestamp <= $__toTime ORDER BY timestamp DESC LIMIT 1)) ORDER BY timestamp",
           "builderOptions": {
             "database": "public",
             "table": "opentelemetry_traces",
@@ -1347,6 +1347,26 @@
               },
               {
                 "name": "span_status_code",
+                "hint": "trace_tags"
+              },
+              {
+                "name": "span_attributes.gen_ai.input.messages",
+                "hint": "trace_tags"
+              },
+              {
+                "name": "span_attributes.gen_ai.output.messages",
+                "hint": "trace_tags"
+              },
+              {
+                "name": "span_attributes.gen_ai.tool.name",
+                "hint": "trace_tags"
+              },
+              {
+                "name": "span_attributes.gen_ai.tool.call.arguments",
+                "hint": "trace_tags"
+              },
+              {
+                "name": "span_attributes.gen_ai.tool.call.result",
                 "hint": "trace_tags"
               },
               {
