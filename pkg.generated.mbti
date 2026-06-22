@@ -1,0 +1,107 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "cybershang/agent-observability"
+
+import {
+  "moonbit-community/opentelemetry/interface/context",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub async fn env(String, default? : String) -> String
+
+pub async fn execute_tool(String, String, parent_context? : @context.Context) -> String
+
+pub fn parse_int(String, Int) -> Int
+
+pub async fn read_dotenv(String) -> String?
+
+pub let tools : Array[Tool]
+
+// Errors
+
+// Types and methods
+pub struct Agent {
+  client : Client
+  messages : Array[Message]
+  tools : Array[Tool]
+  max_tool_turns : Int
+}
+pub fn Agent::new(Client, tools? : Array[Tool], max_tool_turns? : Int) -> Self
+pub async fn Agent::run(Self, String) -> AgentTurnResult
+
+pub struct AgentTurnResult {
+  reply : String
+  tool_calls : Array[ToolCallRecord]
+} derive(@debug.Debug)
+
+pub struct Client {
+  provider_name : String
+  base_url : String
+  model : String
+  api_key : String
+  max_tokens : Int
+  capture_content : Bool
+}
+pub async fn Client::chat(Self, Array[Message], tools? : Array[Tool], parent_context? : @context.Context) -> LLMResponse
+pub fn Client::from_settings(Settings) -> Self
+pub fn Client::new(provider_name~ : String, base_url~ : String, model~ : String, api_key~ : String, max_tokens? : Int, capture_content? : Bool) -> Self
+
+pub(all) struct LLMResponse {
+  content : String?
+  tool_calls : Array[ToolCall]
+  finish_reason : String
+  response_id : String?
+  response_model : String?
+} derive(@debug.Debug)
+
+pub struct Message {
+  role : String
+  content : String?
+  tool_calls : Array[ToolCall]?
+  tool_call_id : String?
+} derive(@debug.Debug)
+pub fn Message::new(role? : String, content? : String?, tool_calls? : Array[ToolCall]?, tool_call_id? : String?) -> Self
+pub fn Message::to_json(Self) -> Json
+
+pub struct RegisteredTool {
+  tool : Tool
+  handler : async (String) -> String
+}
+
+pub struct Settings {
+  provider_name : String
+  base_url : String
+  model : String
+  api_key : String
+  max_tokens : Int
+  max_tool_turns : Int
+  otel_stdout : Bool
+  otel_endpoint : String
+  capture_content : Bool
+}
+pub async fn Settings::from_env() -> Self
+
+pub struct Tool {
+  name : String
+  description : String
+  parameters : Json
+} derive(@debug.Debug)
+pub fn Tool::new(name~ : String, description~ : String, parameters~ : Json) -> Self
+
+pub(all) struct ToolCall {
+  id : String
+  name : String
+  arguments : String
+} derive(@debug.Debug)
+pub fn ToolCall::to_json(Self) -> Json
+
+pub struct ToolCallRecord {
+  call : ToolCall
+  result : String
+} derive(@debug.Debug)
+
+// Type aliases
+pub type ToolHandler = async (String) -> String
+
+// Traits
+

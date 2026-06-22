@@ -196,10 +196,8 @@ async fn do_init_telemetry(
   let conversation_log_table = env_with_dotenv("GREPTIME_LOG_TABLE").unwrap_or(
     "genai_conversations",
   )
-  let conversation_log_exporter = match build_log_exporter(
-    exporter_type,
-    log_table=Some(conversation_log_table),
-  ) {
+  let conversation_log_exporter = match
+    build_log_exporter(exporter_type, log_table=Some(conversation_log_table)) {
     Some(exporter) => safe_log_exporter(exporter)
     None => @sdklogs.InMemoryLogExporter::new().into_log_exporter()
   }
@@ -222,14 +220,10 @@ async fn do_init_telemetry(
     Custom(_) => "custom"
     NoOp => "noop"
   }
-  log_info(
-    "cybershang/agent-telemetry",
-    "Telemetry initialized",
-    attributes=[
-      @otel.KeyValue::new("service.name", String(config.service_name)),
-      @otel.KeyValue::new("telemetry.exporter.kind", String(exporter_kind)),
-    ],
-  ) catch {
+  log_info("cybershang/agent-telemetry", "Telemetry initialized", attributes=[
+    @otel.KeyValue::new("service.name", String(config.service_name)),
+    @otel.KeyValue::new("telemetry.exporter.kind", String(exporter_kind)),
+  ]) catch {
     _ => ()
   }
   providers
@@ -301,7 +295,10 @@ fn safe_log_exporter(inner : @sdklogs.LogExporter) -> @sdklogs.LogExporter {
             format_telemetry_error(err) +
             "\n",
           )
-          @error.export_failure(name, "export failed: " + format_telemetry_error(err))
+          @error.export_failure(
+            name,
+            "export failed: " + format_telemetry_error(err),
+          )
         }
       }
     },
@@ -313,7 +310,10 @@ fn safe_log_exporter(inner : @sdklogs.LogExporter) -> @sdklogs.LogExporter {
             format_telemetry_error(err) +
             "\n",
           )
-          @error.export_failure(name, "force_flush failed: " + format_telemetry_error(err))
+          @error.export_failure(
+            name,
+            "force_flush failed: " + format_telemetry_error(err),
+          )
         }
       }
     },
@@ -325,7 +325,10 @@ fn safe_log_exporter(inner : @sdklogs.LogExporter) -> @sdklogs.LogExporter {
             format_telemetry_error(err) +
             "\n",
           )
-          @error.export_failure(name, "shutdown failed: " + format_telemetry_error(err))
+          @error.export_failure(
+            name,
+            "shutdown failed: " + format_telemetry_error(err),
+          )
         }
       }
     },
@@ -383,7 +386,9 @@ fn parse_header_env(value : String) -> Map[String, String] {
     }
     match trimmed.split_once("=") {
       Some((k, v)) =>
-        headers[k.trim(char_set=" ").to_owned()] = v.trim(char_set=" ").to_owned()
+        headers[k.trim(char_set=" ").to_owned()] = v
+          .trim(char_set=" ")
+          .to_owned()
       None => ()
     }
   }
@@ -401,7 +406,9 @@ async fn build_signal_headers(signal_key : String) -> Map[String, String] {
   if signal_value != "" {
     parse_header_env(signal_value)
   } else {
-    let global_value = env_with_dotenv("OTEL_EXPORTER_OTLP_HEADERS").unwrap_or("")
+    let global_value = env_with_dotenv("OTEL_EXPORTER_OTLP_HEADERS").unwrap_or(
+      "",
+    )
     if global_value != "" {
       parse_header_env(global_value)
     } else {
@@ -779,6 +786,58 @@ pub fn set_attributes(
   for attr in attributes {
     span.set_attribute(attr)
   }
+}
+
+///|
+/// Set a string attribute on a span.
+pub fn set_string_attribute(
+  span : @trace.Span,
+  name : String,
+  value : String,
+) -> Unit {
+  span.set_attribute(@otel.KeyValue::new(name, String(value)))
+}
+
+///|
+/// Set an integer attribute on a span.
+pub fn set_int_attribute(
+  span : @trace.Span,
+  name : String,
+  value : Int64,
+) -> Unit {
+  span.set_attribute(@otel.KeyValue::new(name, Int64(value)))
+}
+
+///|
+/// Set a floating-point attribute on a span.
+pub fn set_double_attribute(
+  span : @trace.Span,
+  name : String,
+  value : Double,
+) -> Unit {
+  span.set_attribute(@otel.KeyValue::new(name, Double(value)))
+}
+
+///|
+/// Set a boolean attribute on a span.
+pub fn set_bool_attribute(
+  span : @trace.Span,
+  name : String,
+  value : Bool,
+) -> Unit {
+  span.set_attribute(@otel.KeyValue::new(name, Bool(value)))
+}
+
+///|
+/// Set a JSON attribute on a span.
+/// The JSON value is serialized to a string, which is useful for structured
+/// custom metadata that does not have a dedicated scalar attribute.
+pub fn set_json_attribute(
+  span : @trace.Span,
+  name : String,
+  value : Json,
+) -> Unit {
+  span.set_attribute(@otel.KeyValue::new(name, String(value.stringify())))
 }
 
 ///| Internal helpers

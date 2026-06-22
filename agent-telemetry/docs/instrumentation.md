@@ -112,6 +112,22 @@ The `parent_context` is passed to the LLM chat request and each tool execution, 
 
 Always pass `parent_context=span.context()` when a function calls another instrumented function. This links the child span to the parent span and produces a single coherent trace. If no parent is available, the helpers default to an empty context.
 
+## Adding Custom Span Attributes
+
+The semantic helpers record the standard GenAI attributes automatically. You can add application-specific attributes with typed helpers:
+
+```moonbit
+let span = @telemetry.start_span(tracer, "my.step")
+@telemetry.set_string_attribute(span, "app.user.id", "user-42")
+@telemetry.set_int_attribute(span, "app.retry.count", 3L)
+@telemetry.set_double_attribute(span, "app.score", 0.95)
+@telemetry.set_bool_attribute(span, "app.cached", true)
+@telemetry.set_json_attribute(span, "app.metadata", { "source": "api", "depth": 2 })
+@telemetry.end_span_ok(span)
+```
+
+`set_json_attribute` serializes the `Json` value to a string attribute, which is convenient for structured metadata that does not fit the scalar attribute types. If you already have an array of `@otel.KeyValue` values, use `set_attributes(span, attrs)` directly.
+
 ## Recording Metrics
 
 Get a `Meter` for your scope and call the semantic metric functions:
