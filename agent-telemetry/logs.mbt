@@ -82,5 +82,18 @@ pub async fn log_conversation_message(
   } else {
     { "content": content.to_json() }.to_json()
   }
-  emit_log(scope_name, @logs.Info, body_json.stringify(), trace_context~)
+  let logger = conversation_logger(scope_name)
+  let record = logger.create_log_record()
+  record.set_severity_number(@logs.Info)
+  record.set_body(@logs.AnyValue::String(body_json.stringify()))
+  match trace_context {
+    Some(ctx) =>
+      record.set_trace_context(
+        ctx.trace_id(),
+        ctx.span_id(),
+        trace_flags=Some(ctx.trace_flags()),
+      )
+    None => ()
+  }
+  logger.emit(record)
 }

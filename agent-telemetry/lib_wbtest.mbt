@@ -32,6 +32,7 @@ fn make_test_telemetry() -> TelemetryProviders {
     tracer_provider,
     meter_provider,
     logger_provider,
+    conversation_logger_provider: logger_provider,
     resource: @resource.Resource::builder().build(),
   }
   global_providers.val = Some(providers)

@@ -47,6 +47,7 @@ pub struct TelemetryProviders {
   tracer_provider : @sdktrace.SdkTracerProvider
   meter_provider : @sdkmetrics.SdkMeterProvider
   logger_provider : @sdklogs.SdkLoggerProvider
+  conversation_logger_provider : @sdklogs.SdkLoggerProvider
   resource : @resource.Resource
 }
 
@@ -173,24 +174,64 @@ async fn do_init_telemetry(
   @sdk.set_meter_provider(meter_provider)
 
   // Logs
-  let log_exporter = match build_log_exporter(exporter_type) {
-    Some(exporter) => exporter
-    None => @sdklogs.InMemoryLogExporter::new().into_log_exporter()
-  }
   let log_batch_config = @sdklogs.BatchConfig::new(
     max_queue_size=2048,
     max_export_batch_size=512,
     scheduled_delay_millis=1000,
     export_timeout_millis=30000,
   )
+
+  // Default logger writes to opentelemetry_logs (no custom table header).
+  let log_exporter = match build_log_exporter(exporter_type) {
+    Some(exporter) => safe_log_exporter(exporter)
+    None => @sdklogs.InMemoryLogExporter::new().into_log_exporter()
+  }
   let logger_provider = @sdklogs.SdkLoggerProvider::builder()
     .with_resource(resource)
     .with_batch_exporter(log_exporter, config=log_batch_config)
     .build()
   @sdk.set_logger_provider(logger_provider)
 
-  let providers = { tracer_provider, meter_provider, logger_provider, resource }
+  // Conversation logger writes to the configured GenAI conversations table.
+  let conversation_log_table = env_with_dotenv("GREPTIME_LOG_TABLE").unwrap_or(
+    "genai_conversations",
+  )
+  let conversation_log_exporter = match build_log_exporter(
+    exporter_type,
+    log_table=Some(conversation_log_table),
+  ) {
+    Some(exporter) => safe_log_exporter(exporter)
+    None => @sdklogs.InMemoryLogExporter::new().into_log_exporter()
+  }
+  let conversation_logger_provider = @sdklogs.SdkLoggerProvider::builder()
+    .with_resource(resource)
+    .with_batch_exporter(conversation_log_exporter, config=log_batch_config)
+    .build()
+
+  let providers = {
+    tracer_provider,
+    meter_provider,
+    logger_provider,
+    conversation_logger_provider,
+    resource,
+  }
   global_providers.val = Some(providers)
+  let exporter_kind = match exporter_type {
+    Stdout => "stdout"
+    Otlp(endpoint) => "otlp:" + endpoint
+    Custom(_) => "custom"
+    NoOp => "noop"
+  }
+  log_info(
+    "cybershang/agent-telemetry",
+    "Telemetry initialized",
+    attributes=[
+      @otel.KeyValue::new("service.name", String(config.service_name)),
+      @otel.KeyValue::new("telemetry.exporter.kind", String(exporter_kind)),
+    ],
+  ) catch {
+    _ => ()
+  }
   providers
 }
 
@@ -239,6 +280,53 @@ fn safe_span_exporter(inner : @sdktrace.SpanExporter) -> @sdktrace.SpanExporter 
             name,
             "shutdown failed: " + format_telemetry_error(err),
           )
+      }
+    },
+    name_fn=() => name,
+  )
+}
+
+///|
+/// Wrap a log exporter so that export/flush/shutdown errors are logged to stdout
+/// instead of being raised. This prevents OTLP network failures from crashing
+/// the application or failing log emission.
+fn safe_log_exporter(inner : @sdklogs.LogExporter) -> @sdklogs.LogExporter {
+  let name = inner.name()
+  @sdklogs.LogExporter::new(
+    async fn(batch) {
+      inner.export_batch(batch) catch {
+        err => {
+          @stdio.stdout.write(
+            "[Telemetry] log export failed: " +
+            format_telemetry_error(err) +
+            "\n",
+          )
+          @error.export_failure(name, "export failed: " + format_telemetry_error(err))
+        }
+      }
+    },
+    force_flush_fn=async fn() {
+      inner.force_flush() catch {
+        err => {
+          @stdio.stdout.write(
+            "[Telemetry] log force_flush failed: " +
+            format_telemetry_error(err) +
+            "\n",
+          )
+          @error.export_failure(name, "force_flush failed: " + format_telemetry_error(err))
+        }
+      }
+    },
+    shutdown_fn=async fn() {
+      inner.shutdown() catch {
+        err => {
+          @stdio.stdout.write(
+            "[Telemetry] log shutdown failed: " +
+            format_telemetry_error(err) +
+            "\n",
+          )
+          @error.export_failure(name, "shutdown failed: " + format_telemetry_error(err))
+        }
       }
     },
     name_fn=() => name,
@@ -363,17 +451,21 @@ async fn build_metric_exporter(
 
 ///|
 /// Build a log exporter from the requested exporter type.
+/// When `log_table` is provided, the exporter sets `X-Greptime-Log-Table-Name`
+/// so logs are routed to that custom table. Otherwise logs go to the default
+/// `opentelemetry_logs` table.
 async fn build_log_exporter(
   exporter_type : ExporterType,
+  log_table? : String? = None,
 ) -> @sdklogs.LogExporter? {
   match exporter_type {
     Stdout => None
     Otlp(endpoint) => {
       let headers : Map[String, String] = {}
-      let log_table = env_with_dotenv("GREPTIME_LOG_TABLE").unwrap_or(
-        "genai_conversations",
-      )
-      headers["X-Greptime-Log-Table-Name"] = log_table
+      match log_table {
+        Some(table) => headers["X-Greptime-Log-Table-Name"] = table
+        None => ()
+      }
       match
         @otlp.LogExporter::builder()
         .with_http()
@@ -413,6 +505,10 @@ pub fn TelemetryProviders::spawn_background_tasks(
 ) -> Unit {
   self.meter_provider.spawn_periodic_readers(group, allow_failure~)
   self.logger_provider.spawn_batch_processor_tasks(group, allow_failure~)
+  self.conversation_logger_provider.spawn_batch_processor_tasks(
+    group,
+    allow_failure~,
+  )
 }
 
 ///|
@@ -441,6 +537,15 @@ pub async fn TelemetryProviders::force_flush(self : TelemetryProviders) -> Unit 
     Err(err) =>
       @stdio.stdout.write(
         "[Telemetry] log force_flush failed: " +
+        format_otel_sdk_error(err) +
+        "\n",
+      )
+  }
+  match self.conversation_logger_provider.force_flush() {
+    Ok(_) => ()
+    Err(err) =>
+      @stdio.stdout.write(
+        "[Telemetry] conversation log force_flush failed: " +
         format_otel_sdk_error(err) +
         "\n",
       )
@@ -475,6 +580,15 @@ pub async fn TelemetryProviders::shutdown(self : TelemetryProviders) -> Unit {
         "[Telemetry] log shutdown failed: " + format_otel_sdk_error(err) + "\n",
       )
   }
+  match self.conversation_logger_provider.shutdown() {
+    Ok(_) => ()
+    Err(err) =>
+      @stdio.stdout.write(
+        "[Telemetry] conversation log shutdown failed: " +
+        format_otel_sdk_error(err) +
+        "\n",
+      )
+  }
 }
 
 ///| Meter cache
@@ -500,14 +614,15 @@ pub fn meter(scope_name : String) -> @metrics.Meter {
   }
 }
 
-///| Logger cache
+///| Logger caches
 
 ///|
-/// Cache of loggers keyed by scope name.
+/// Cache of default loggers keyed by scope name.
 let logger_cache : Ref[Map[String, @logs.Logger]] = Ref({})
 
 ///|
 /// Get or create a logger for the given scope name.
+/// Logs from this logger go to the default `opentelemetry_logs` table.
 pub fn logger(scope_name : String) -> @logs.Logger {
   match logger_cache.val.get(scope_name) {
     Some(l) => l
@@ -518,6 +633,30 @@ pub fn logger(scope_name : String) -> @logs.Logger {
       }
       let l = provider.logger(scope_name)
       logger_cache.val.set(scope_name, l)
+      l
+    }
+  }
+}
+
+///|
+/// Cache of conversation loggers keyed by scope name.
+let conversation_logger_cache : Ref[Map[String, @logs.Logger]] = Ref({})
+
+///|
+/// Get or create a logger for conversation messages.
+/// Logs from this logger go to the configured GenAI conversations table
+/// (default `genai_conversations`).
+pub fn conversation_logger(scope_name : String) -> @logs.Logger {
+  match conversation_logger_cache.val.get(scope_name) {
+    Some(l) => l
+    None => {
+      let provider = match global_providers.val {
+        Some(providers) =>
+          providers.conversation_logger_provider.into_logger_provider()
+        None => @logs.LoggerProvider::noop()
+      }
+      let l = provider.logger(scope_name)
+      conversation_logger_cache.val.set(scope_name, l)
       l
     }
   }

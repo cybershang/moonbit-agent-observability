@@ -38,6 +38,7 @@ async test "manual reader collects gen_ai operation duration metric" {
     tracer_provider: @sdktrace.SdkTracerProvider::builder().build(),
     meter_provider: provider,
     logger_provider: @sdklogs.SdkLoggerProvider::builder().build(),
+    conversation_logger_provider: @sdklogs.SdkLoggerProvider::builder().build(),
     resource: @resource.Resource::builder().build(),
   })
 
@@ -61,6 +62,7 @@ async test "manual reader collects gen_ai token usage metric" {
     tracer_provider: @sdktrace.SdkTracerProvider::builder().build(),
     meter_provider: provider,
     logger_provider: @sdklogs.SdkLoggerProvider::builder().build(),
+    conversation_logger_provider: @sdklogs.SdkLoggerProvider::builder().build(),
     resource: @resource.Resource::builder().build(),
   })
 

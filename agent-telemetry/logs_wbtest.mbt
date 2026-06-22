@@ -12,6 +12,7 @@ async test "log_info emits a log record" {
     tracer_provider: @sdktrace.SdkTracerProvider::builder().build(),
     meter_provider: @sdkmetrics.SdkMeterProvider::builder().build(),
     logger_provider: provider,
+    conversation_logger_provider: provider,
     resource: @resource.Resource::builder().build(),
   })
 
@@ -33,6 +34,7 @@ async test "log_error emits error severity" {
     tracer_provider: @sdktrace.SdkTracerProvider::builder().build(),
     meter_provider: @sdkmetrics.SdkMeterProvider::builder().build(),
     logger_provider: provider,
+    conversation_logger_provider: provider,
     resource: @resource.Resource::builder().build(),
   })
 
@@ -54,6 +56,7 @@ async test "log_conversation_message emits user and assistant bodies" {
     tracer_provider: @sdktrace.SdkTracerProvider::builder().build(),
     meter_provider: @sdkmetrics.SdkMeterProvider::builder().build(),
     logger_provider: provider,
+    conversation_logger_provider: provider,
     resource: @resource.Resource::builder().build(),
   })
 
