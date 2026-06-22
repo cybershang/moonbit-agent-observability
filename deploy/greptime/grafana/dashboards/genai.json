@@ -80,26 +80,6 @@
         "label": "Trace ID",
         "type": "textbox",
         "hide": 0
-      },
-      {
-        "current": {
-          "text": "0.15",
-          "value": "0.15"
-        },
-        "name": "input_price",
-        "label": "Input $/1M",
-        "type": "textbox",
-        "hide": 1
-      },
-      {
-        "current": {
-          "text": "0.60",
-          "value": "0.60"
-        },
-        "name": "output_price",
-        "label": "Output $/1M",
-        "type": "textbox",
-        "hide": 1
       }
     ]
   },
@@ -205,8 +185,8 @@
     },
     {
       "type": "stat",
-      "title": "Estimated Cost (USD)",
-      "description": "Uses Input $/1M and Output $/1M variables (default: gpt-4o-mini pricing).",
+      "title": "Estimated Cost (RMB)",
+      "description": "Cost is computed from the per-minute token usage aggregate (genai_token_usage_1m) JOINed with the model_pricing table maintained in GreptimeDB.",
       "gridPos": {
         "h": 4,
         "w": 6,
@@ -220,14 +200,14 @@
       "targets": [
         {
           "editorMode": "code",
-          "rawSql": "SELECT ROUND(SUM(`span_attributes.gen_ai.usage.input_tokens`) * ${input_price} / 1000000 + SUM(`span_attributes.gen_ai.usage.output_tokens`) * ${output_price} / 1000000, 4) AS cost_usd FROM opentelemetry_traces WHERE $__timeFilter(timestamp) AND `span_attributes.gen_ai.provider.name` IS NOT NULL",
+          "rawSql": "SELECT ROUND(SUM(f.total_input_tokens * p.input_price_rmb_per_1m / 1000000 + f.total_output_tokens * p.output_price_rmb_per_1m / 1000000), 4) AS cost_rmb FROM genai_token_usage_1m f JOIN model_pricing p ON f.model = p.model WHERE $__timeFilter(f.time_window)",
           "format": "table",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyUSD",
+          "unit": "currencyRMB",
           "decimals": 4,
           "color": {
             "mode": "fixed",
@@ -489,8 +469,8 @@
     },
     {
       "type": "timeseries",
-      "title": "Cumulative Cost (USD)",
-      "description": "Uses Input $/1M and Output $/1M variables (default: gpt-4o-mini pricing).",
+      "title": "Cumulative Cost (RMB)",
+      "description": "Cumulative cost from genai_token_usage_1m JOINed with the model_pricing table maintained in GreptimeDB.",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -504,7 +484,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "rawSql": "SELECT time_window AS time, SUM(SUM(total_input_tokens * ${input_price} / 1000000 + total_output_tokens * ${output_price} / 1000000)) OVER (ORDER BY time_window) AS cumulative_cost FROM genai_token_usage_1m WHERE $__timeFilter(time_window) GROUP BY time_window ORDER BY time_window",
+          "rawSql": "SELECT f.time_window AS time, SUM(SUM(f.total_input_tokens * p.input_price_rmb_per_1m / 1000000 + f.total_output_tokens * p.output_price_rmb_per_1m / 1000000)) OVER (ORDER BY f.time_window) AS cumulative_cost FROM genai_token_usage_1m f JOIN model_pricing p ON f.model = p.model WHERE $__timeFilter(f.time_window) GROUP BY f.time_window ORDER BY f.time_window",
           "format": "time_series",
           "refId": "A"
         }
@@ -515,7 +495,7 @@
             "drawStyle": "line",
             "fillOpacity": 15
           },
-          "unit": "currencyUSD",
+          "unit": "currencyRMB",
           "min": 0
         },
         "overrides": []
@@ -742,8 +722,8 @@
     },
     {
       "type": "timeseries",
-      "title": "Avg Cost per Request",
-      "description": "Uses Input $/1M and Output $/1M variables (default: gpt-4o-mini pricing).",
+      "title": "Avg Cost per Request (RMB)",
+      "description": "Average cost per request from genai_token_usage_1m JOINed with the model_pricing table maintained in GreptimeDB.",
       "gridPos": {
         "h": 8,
         "w": 8,
@@ -757,7 +737,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "rawSql": "SELECT time_window AS time, model, ROUND((total_input_tokens * ${input_price} + total_output_tokens * ${output_price}) / 1000000 / GREATEST(request_count, 1), 6) AS cost_per_request FROM genai_token_usage_1m WHERE $__timeFilter(time_window) ORDER BY time_window",
+          "rawSql": "SELECT f.time_window AS time, f.model, ROUND((f.total_input_tokens * p.input_price_rmb_per_1m + f.total_output_tokens * p.output_price_rmb_per_1m) / 1000000 / GREATEST(f.request_count, 1), 6) AS cost_per_request FROM genai_token_usage_1m f JOIN model_pricing p ON f.model = p.model WHERE $__timeFilter(f.time_window) GROUP BY f.time_window, f.model ORDER BY f.time_window",
           "format": "time_series",
           "refId": "A"
         }
@@ -768,7 +748,7 @@
             "drawStyle": "line",
             "fillOpacity": 10
           },
-          "unit": "currencyUSD",
+          "unit": "currencyRMB",
           "decimals": 6,
           "min": 0
         },

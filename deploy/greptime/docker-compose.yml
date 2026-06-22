@@ -31,6 +31,21 @@ services:
     networks:
       - greptime-network
 
+  init-pricing:
+    image: curlimages/curl:8.12.1
+    volumes:
+      - ./init-pricing.sh:/init-pricing.sh:ro
+      - ./pricing.sql:/pricing.sql:ro
+    entrypoint: ["/bin/sh", "/init-pricing.sh"]
+    environment:
+      GREPTIME_URL: http://greptimedb:4000
+    depends_on:
+      greptimedb:
+        condition: service_healthy
+    networks:
+      - greptime-network
+    restart: "no"
+
   init-flow:
     image: curlimages/curl:8.12.1
     volumes:

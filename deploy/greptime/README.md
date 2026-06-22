@@ -59,6 +59,14 @@ combines:
 Run them automatically with the `load` profile, or execute `init-flow.sh` manually
 once GreptimeDB is healthy.
 
+## Model Pricing
+
+`pricing.sql` seeds the `model_pricing` table used by the cost panels.
+It is loaded automatically by the `init-pricing` container when GreptimeDB
+becomes healthy, or you can run `init-pricing.sh` manually.
+
+Update the prices in `pricing.sql` when providers change their rate cards.
+
 ## Trace / Log Filter
 
 To find GenAI spans in SQL:
