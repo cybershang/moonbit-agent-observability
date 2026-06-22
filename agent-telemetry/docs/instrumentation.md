@@ -174,9 +174,28 @@ Body JSON shapes:
 - `user` / `tool`: `{"content":"..."}`
 - `assistant`: `{"index":0,"message":{"role":"assistant","content":"..."}}`
 
+## OTLP Headers
+
+You can pass custom headers to each OTLP exporter using standard environment variables:
+
+| Variable | Scope | Fallback |
+|---|---|---|
+| `OTEL_EXPORTER_OTLP_HEADERS` | All signals | — |
+| `OTEL_EXPORTER_OTLP_TRACES_HEADERS` | Traces only | `OTEL_EXPORTER_OTLP_HEADERS` |
+| `OTEL_EXPORTER_OTLP_METRICS_HEADERS` | Metrics only | `OTEL_EXPORTER_OTLP_HEADERS` |
+| `OTEL_EXPORTER_OTLP_LOGS_HEADERS` | Logs only | `OTEL_EXPORTER_OTLP_HEADERS` |
+
+Format is comma-separated `key=value` pairs:
+
+```bash
+OTEL_EXPORTER_OTLP_TRACES_HEADERS="Authorization=Bearer my-token"
+```
+
+This is useful when your observability backend requires authentication tokens or tenant routing headers.
+
 ## GreptimeDB Integration
 
-When exporting to GreptimeDB via OTLP/HTTP, the library automatically adds Greptime-specific headers:
+When exporting to GreptimeDB via OTLP/HTTP, the library automatically adds Greptime-specific headers unless you already provided them via the variables above:
 
 | Variable | Default | Header | Used by |
 |---|---|---|---|

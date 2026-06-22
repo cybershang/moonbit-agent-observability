@@ -78,8 +78,20 @@ See [docs/instrumentation.md](docs/instrumentation.md) for a step-by-step guide 
 | `OTEL_SERVICE_NAME` | Service name | `agent-telemetry` |
 | `OTEL_STDOUT` | Use the stdout exporter when set to `true` | `false` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP/HTTP endpoint | `http://localhost:4318` |
+| `OTEL_EXPORTER_OTLP_HEADERS` | Global OTLP headers, comma-separated `key=value` pairs | *(empty)* |
+| `OTEL_EXPORTER_OTLP_TRACES_HEADERS` | Trace-specific OTLP headers | *(empty, falls back to global)* |
+| `OTEL_EXPORTER_OTLP_METRICS_HEADERS` | Metric-specific OTLP headers | *(empty, falls back to global)* |
+| `OTEL_EXPORTER_OTLP_LOGS_HEADERS` | Log-specific OTLP headers | *(empty, falls back to global)* |
 | `GREPTIME_TRACE_PIPELINE` | GreptimeDB trace pipeline name | `greptime_trace_v1` |
 | `GREPTIME_LOG_TABLE` | Target table for conversation logs | `genai_conversations` |
+
+Signal-specific header variables take precedence over `OTEL_EXPORTER_OTLP_HEADERS`. This is useful for backends that require authentication tokens or custom routing headers.
+
+For example:
+
+```bash
+OTEL_EXPORTER_OTLP_LOGS_HEADERS="Authorization=Bearer my-token, X-Scope-OrgID=tenant-1"
+```
 
 ## Log Routing
 

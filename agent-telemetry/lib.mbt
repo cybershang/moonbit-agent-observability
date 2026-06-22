@@ -373,6 +373,44 @@ fn normalize_signal_endpoint(endpoint : String, signal_path : String) -> String 
 }
 
 ///|
+/// Parse a comma-separated `key1=value1,key2=value2` string into a header map.
+fn parse_header_env(value : String) -> Map[String, String] {
+  let headers : Map[String, String] = {}
+  for part in value.split(",") {
+    let trimmed = part.trim(char_set=" ")
+    if trimmed.is_empty() {
+      continue
+    }
+    match trimmed.split_once("=") {
+      Some((k, v)) =>
+        headers[k.trim(char_set=" ").to_owned()] = v.trim(char_set=" ").to_owned()
+      None => ()
+    }
+  }
+  headers
+}
+
+///|
+/// Build the initial header map for a signal-specific OTLP exporter.
+/// Reads `OTEL_EXPORTER_OTLP_<SIGNAL>_HEADERS` first, then falls back to
+/// `OTEL_EXPORTER_OTLP_HEADERS`.
+async fn build_signal_headers(signal_key : String) -> Map[String, String] {
+  let signal_value = env_with_dotenv(
+    "OTEL_EXPORTER_OTLP_" + signal_key + "_HEADERS",
+  ).unwrap_or("")
+  if signal_value != "" {
+    parse_header_env(signal_value)
+  } else {
+    let global_value = env_with_dotenv("OTEL_EXPORTER_OTLP_HEADERS").unwrap_or("")
+    if global_value != "" {
+      parse_header_env(global_value)
+    } else {
+      {}
+    }
+  }
+}
+
+///|
 /// Build a span exporter from the requested exporter type.
 async fn build_trace_exporter(
   exporter_type : ExporterType,
@@ -380,11 +418,13 @@ async fn build_trace_exporter(
   match exporter_type {
     Stdout => Some(@print.SpanExporter::new().into_span_exporter())
     Otlp(endpoint) => {
-      let headers : Map[String, String] = {}
+      let headers = build_signal_headers("TRACES")
       let trace_pipeline = env_with_dotenv("GREPTIME_TRACE_PIPELINE").unwrap_or(
         "greptime_trace_v1",
       )
-      headers["X-Greptime-Pipeline-Name"] = trace_pipeline
+      if !headers.contains("X-Greptime-Pipeline-Name") {
+        headers["X-Greptime-Pipeline-Name"] = trace_pipeline
+      }
       match
         @otlp.SpanExporter::builder()
         .with_http()
@@ -422,11 +462,13 @@ async fn build_metric_exporter(
 ) -> @sdkmetrics.MetricExporter? {
   match exporter_type {
     Stdout => None
-    Otlp(endpoint) =>
+    Otlp(endpoint) => {
+      let headers = build_signal_headers("METRICS")
       match
         @otlp.MetricExporter::builder()
         .with_http()
         .with_endpoint(normalize_signal_endpoint(endpoint, "/v1/metrics"))
+        .with_headers(headers)
         .build() {
         Ok(exporter) => Some(exporter.into_metric_exporter())
         Err(err) => {
@@ -444,6 +486,7 @@ async fn build_metric_exporter(
           None
         }
       }
+    }
     Custom(_) => None
     NoOp => None
   }
@@ -461,9 +504,12 @@ async fn build_log_exporter(
   match exporter_type {
     Stdout => None
     Otlp(endpoint) => {
-      let headers : Map[String, String] = {}
+      let headers = build_signal_headers("LOGS")
       match log_table {
-        Some(table) => headers["X-Greptime-Log-Table-Name"] = table
+        Some(table) =>
+          if !headers.contains("X-Greptime-Log-Table-Name") {
+            headers["X-Greptime-Log-Table-Name"] = table
+          }
         None => ()
       }
       match

@@ -65,3 +65,10 @@ async test "init_telemetry tolerates unreachable OTLP endpoint" {
   end_span_ok(span)
   providers.force_flush()
 }
+
+///|
+test "parse_header_env parses comma separated key=value pairs" {
+  let headers = parse_header_env("Authorization=Bearer token, X-Custom = value ")
+  assert_eq(headers["Authorization"], "Bearer token")
+  assert_eq(headers["X-Custom"], "value")
+}
