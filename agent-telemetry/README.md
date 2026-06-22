@@ -58,12 +58,12 @@ let providers = @telemetry.init_telemetry(
 
 | Scenario | Functions |
 |---|---|
-| General | `TelemetryConfig::new`, `init_telemetry`, `init_from_env`, `TelemetryProviders`, `IdGeneratorOption`, `tracer`, `meter`, `logger`, `start_span`, `end_span`, `end_span_ok`, `end_span_error` |
+| General | `TelemetryConfig::new`, `init_telemetry`, `init_from_env`, `TelemetryProviders`, `IdGeneratorOption`, `tracer`, `meter`, `logger`, `conversation_logger`, `start_span`, `end_span`, `end_span_ok`, `end_span_error` |
 | LLM chat | `start_chat_span`, `record_chat_usage`, `record_chat_response`, `set_chat_http_error` |
 | Tool | `start_tool_span`, `record_tool_result`, `set_tool_error` |
 | Agent turn | `start_agent_turn_span`, `record_turn_metrics`, `set_turn_max_tool_turns_error` |
 | Metrics | `record_llm_call`, `record_llm_latency`, `record_tool_call`, `record_turn_count` |
-| Logs | `emit_log`, `log_info`, `log_warn`, `log_error` |
+| Logs | `emit_log`, `log_info`, `log_warn`, `log_error`, `log_conversation_message` |
 
 ## Instrumentation Guide
 
@@ -78,6 +78,17 @@ See [docs/instrumentation.md](docs/instrumentation.md) for a step-by-step guide 
 | `OTEL_SERVICE_NAME` | Service name | `agent-telemetry` |
 | `OTEL_STDOUT` | Use the stdout exporter when set to `true` | `false` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP/HTTP endpoint | `http://localhost:4318` |
+| `GREPTIME_TRACE_PIPELINE` | GreptimeDB trace pipeline name | `greptime_trace_v1` |
+| `GREPTIME_LOG_TABLE` | Target table for conversation logs | `genai_conversations` |
+
+## Log Routing
+
+The library maintains two separate loggers:
+
+- **Default logger** (`logger` / `log_info` / `log_warn` / `log_error`) writes to the standard OTLP logs table (`opentelemetry_logs` by default).
+- **Conversation logger** (`conversation_logger` / `log_conversation_message`) writes to the table configured by `GREPTIME_LOG_TABLE` (default `genai_conversations`).
+
+When exporting to GreptimeDB, this lets you keep general application logs and LLM conversation logs in separate tables.
 
 ## Flushing and Shutting Down
 

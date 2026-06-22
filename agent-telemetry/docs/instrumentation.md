@@ -148,6 +148,8 @@ Use severity helpers or the generic `emit_log` function:
 
 When `trace_context` is provided, the log record is linked to the active trace/span.
 
+These severity helpers write to the default OTLP log table (`opentelemetry_logs` when exporting to GreptimeDB).
+
 To record conversation messages in a format compatible with the `genai-observability` GreptimeDB dashboard SQL:
 
 ```moonbit
@@ -174,11 +176,18 @@ Body JSON shapes:
 
 ## GreptimeDB Integration
 
-When exporting to GreptimeDB via OTLP/HTTP, the library automatically adds Greptime-specific headers when the corresponding environment variables are set:
+When exporting to GreptimeDB via OTLP/HTTP, the library automatically adds Greptime-specific headers:
 
-| Variable | Default | Header |
-|---|---|---|
-| `GREPTIME_TRACE_PIPELINE` | `greptime_trace_v1` | `x-greptime-pipeline-name` |
-| `GREPTIME_LOG_TABLE` | *(empty, header omitted)* | `x-greptime-log-table-name` |
+| Variable | Default | Header | Used by |
+|---|---|---|---|
+| `GREPTIME_TRACE_PIPELINE` | `greptime_trace_v1` | `x-greptime-pipeline-name` | Trace exporter |
+| `GREPTIME_LOG_TABLE` | `genai_conversations` | `x-greptime-log-table-name` | Conversation log exporter |
 
 Values are read via `env_with_dotenv`, which checks the process environment first and then the `.env` file in the working directory.
+
+### Log destinations
+
+- `log_info`, `log_warn`, `log_error`, and the generic `emit_log` use the **default logger**, which does not set `x-greptime-log-table-name`. These logs land in GreptimeDB's default `opentelemetry_logs` table.
+- `log_conversation_message` uses the **conversation logger**, which sends logs to the table configured by `GREPTIME_LOG_TABLE` (default `genai_conversations`).
+
+This separation makes it easy to query general application logs and LLM conversation logs independently.
