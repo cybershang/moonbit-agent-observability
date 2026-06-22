@@ -113,6 +113,8 @@ pub fn Client::from_settings(settings : Settings) -> Client {
 /// - `gen_ai.response.model` (from response)
 /// - `gen_ai.response.finish_reasons` (from response)
 /// - `gen_ai.input.messages` and `gen_ai.output.messages` when `capture_content` is enabled
+/// - `gen_ai.client.token.usage` metric for input/output tokens
+/// - Conversation logs when `capture_content` is enabled
 pub async fn Client::chat(
   self : Client,
   messages : Array[Message],
@@ -120,17 +122,21 @@ pub async fn Client::chat(
   parent_context? : @context.Context = @context.Context::empty(),
 ) -> LLMResponse {
   let tracer = @telemetry.tracer("cybershang/agent-observability/llm")
+  let meter = @telemetry.meter("cybershang/agent-observability/llm")
   let input_messages = if self.capture_content {
     Some(messages_to_json_array(messages))
   } else {
     None
   }
+  let (server_address, server_port) = parse_base_url(self.base_url)
   let span = @telemetry.start_chat_span(
     tracer,
     self.provider_name,
     self.model,
     self.max_tokens,
     input_messages~,
+    server_address~,
+    server_port~,
     parent_context~,
   )
 
@@ -145,40 +151,122 @@ pub async fn Client::chat(
     "Authorization": "Bearer " + self.api_key,
   }
 
+  // Log input conversation messages when content capture is enabled.
+  if self.capture_content {
+    for index, msg in messages {
+      let content = msg.content.unwrap_or("")
+      @telemetry.log_conversation_message(
+        "cybershang/agent-observability/llm",
+        msg.role,
+        content,
+        index~,
+        trace_context=Some(span.span_context()),
+      )
+    }
+  }
+
   // HTTP POST with error handling
+  let start = @telemetry.now_seconds()
   let (response, resp_body) = @http.post(
     self.base_url + "/chat/completions",
     body_json,
     headers~,
   )
+  let elapsed = @telemetry.now_seconds() - start
+  @telemetry.record_llm_latency(
+    meter,
+    self.provider_name,
+    self.model,
+    seconds=elapsed,
+  )
 
   guard response.code == 200 else {
     @telemetry.set_chat_http_error(span, response.code)
-    @telemetry.end_span(span)
-    abort("LLM request failed with status: \{response.code}")
+    @telemetry.log_error(
+      "cybershang/agent-observability/llm",
+      "LLM request failed with status \{response.code}",
+      trace_context=Some(span.span_context()),
+    )
+    @telemetry.end_span_error(
+      span,
+      description="LLM request failed with status: \{response.code}",
+    )
+    return {
+      content: Some("[LLM request failed with status \{response.code}]"),
+      tool_calls: [],
+      finish_reason: "stop",
+      response_id: None,
+      response_model: None,
+    }
   }
 
   let data = resp_body.json()
   let llm_resp = parse_llm_response(data)
 
-  // Extract usage from response if available
+  // Extract usage from response if available and record metrics.
   let usage = if data is { "usage": usage_obj, .. } {
     Some(usage_obj)
   } else {
     None
   }
   match usage {
-    Some(u) => @telemetry.record_chat_usage(span, u)
+    Some(u) => {
+      @telemetry.record_chat_usage(span, u)
+      if u is { "prompt_tokens": Number(pt, ..), .. } {
+        @telemetry.record_llm_token_usage(
+          meter,
+          self.provider_name,
+          self.model,
+          "input",
+          pt.to_int64(),
+        )
+      }
+      if u is { "completion_tokens": Number(ct, ..), .. } {
+        @telemetry.record_llm_token_usage(
+          meter,
+          self.provider_name,
+          self.model,
+          "output",
+          ct.to_int64(),
+        )
+      }
+    }
     None => ()
   }
 
-  // Record response metadata and optional output messages
+  // Record response metadata and optional output messages.
   let output_messages = if self.capture_content {
     Some(output_messages_to_json_array(llm_resp))
   } else {
     None
   }
   @telemetry.record_chat_response(span, data, output_messages~)
+
+  // Log output conversation messages when content capture is enabled.
+  if self.capture_content {
+    let output_json = output_messages_to_json_array(llm_resp)
+    if output_json is Array(output_arr) {
+      for index, out_msg in output_arr {
+        let role = if out_msg is { "role": String(r), .. } {
+          r
+        } else {
+          "assistant"
+        }
+        let content = if out_msg is { "content": String(c), .. } {
+          c
+        } else {
+          ""
+        }
+        @telemetry.log_conversation_message(
+          "cybershang/agent-observability/llm",
+          role,
+          content,
+          index~,
+          trace_context=Some(span.span_context()),
+        )
+      }
+    }
+  }
 
   @telemetry.end_span_ok(span)
 
@@ -340,4 +428,31 @@ fn output_messages_to_json_array(response : LLMResponse) -> Json {
     obj["tool_calls"] = response.tool_calls.map(fn(c) { c.to_json() }).to_json()
   }
   [Json::object(obj)].to_json()
+}
+
+///|
+/// Parse a base URL into server address and port for GenAI span attributes.
+fn parse_base_url(base_url : String) -> (String?, Int?) {
+  let mut rest = base_url
+  if rest.has_prefix("http://") {
+    rest = rest[7:].to_owned()
+  } else if rest.has_prefix("https://") {
+    rest = rest[8:].to_owned()
+  }
+  let host_port = match rest.split_once("/") {
+    Some((host_port, _)) => host_port.to_owned()
+    None => rest
+  }
+  match host_port.split_once(":") {
+    Some((host, port_str)) => {
+      let host = host.to_owned()
+      let port = @string.parse_int(port_str) catch { _ => -1 }
+      if port >= 0 {
+        (Some(host), Some(port))
+      } else {
+        (Some(host_port), None)
+      }
+    }
+    None => (Some(host_port), None)
+  }
 }

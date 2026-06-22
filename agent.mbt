@@ -48,6 +48,7 @@ pub struct AgentTurnResult {
 /// calls executed during the turn.
 pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
   let tracer = @telemetry.tracer("cybershang/agent-observability/agent")
+  let meter = @telemetry.meter("cybershang/agent-observability/agent")
   let span = @telemetry.start_agent_turn_span(
     tracer,
     prompt,
@@ -99,9 +100,15 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
   if has_tool_calls {
     final_reply = "[Agent reached maximum tool-call turns without producing a final reply.]"
     @telemetry.set_turn_max_tool_turns_error(span)
+    @telemetry.log_error(
+      "cybershang/agent-observability/agent",
+      "Agent reached max_tool_turns without final reply",
+      trace_context=Some(span.span_context()),
+    )
   }
 
   @telemetry.record_turn_metrics(span, turn, executed.length(), final_reply)
+  @telemetry.record_turn_count(meter, max_tool_turns_reached=has_tool_calls)
   @telemetry.end_span_ok(span)
 
   { reply: final_reply, tool_calls: executed }

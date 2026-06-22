@@ -19,39 +19,51 @@ moon add cybershang/agent-telemetry
 // Option 1: one-line initialization from environment variables.
 // Reads OTEL_SERVICE_NAME, OTEL_STDOUT, and OTEL_EXPORTER_OTLP_ENDPOINT.
 // Use ProcessUniqueRandom to avoid duplicate trace/span IDs across restarts.
-let provider = @telemetry.init_from_env(
+let providers = @telemetry.init_from_env(
   id_generator=@telemetry.ProcessUniqueRandom,
 )
 
 // Option 2: manually select an exporter.
 let config = @telemetry.TelemetryConfig::new(service_name="my-agent")
-let provider = @telemetry.init_telemetry(
+let providers = @telemetry.init_telemetry(
   config,
   @telemetry.Otlp("http://localhost:4318"),
   id_generator=@telemetry.ProcessUniqueRandom,
 )
 
-// Create a GenAI chat span.
-let tracer = @telemetry.tracer("my-agent/llm")
-let span = @telemetry.start_chat_span(
-  tracer,
-  provider_name="stepfun",
-  model="step-3.7-flash",
-  max_tokens=1024,
-)
-// ... send the request and obtain response_json ...
-@telemetry.record_chat_response(span, response_json)
-@telemetry.end_span_ok(span)
+// Metrics and logs need background tasks.
+@async.with_task_group((group) => {
+  providers.spawn_background_tasks(group)
+
+  // Create a GenAI chat span.
+  let tracer = @telemetry.tracer("my-agent/llm")
+  let meter = @telemetry.meter("my-agent/llm")
+  let span = @telemetry.start_chat_span(
+    tracer,
+    provider_name="stepfun",
+    model="step-3.7-flash",
+    max_tokens=1024,
+  )
+  // ... send the request and obtain response_json ...
+  @telemetry.record_llm_call(meter, "stepfun", "step-3.7-flash", success=true)
+  @telemetry.record_chat_response(span, response_json)
+  @telemetry.end_span_ok(span)
+
+  providers.force_flush()
+  providers.shutdown()
+})
 ```
 
 ## Main API
 
 | Scenario | Functions |
 |---|---|
-| General | `TelemetryConfig::new`, `init_telemetry`, `init_from_env`, `IdGeneratorOption`, `tracer`, `start_span`, `end_span`, `end_span_ok`, `end_span_error` |
+| General | `TelemetryConfig::new`, `init_telemetry`, `init_from_env`, `TelemetryProviders`, `IdGeneratorOption`, `tracer`, `meter`, `logger`, `start_span`, `end_span`, `end_span_ok`, `end_span_error` |
 | LLM chat | `start_chat_span`, `record_chat_usage`, `record_chat_response`, `set_chat_http_error` |
 | Tool | `start_tool_span`, `record_tool_result`, `set_tool_error` |
 | Agent turn | `start_agent_turn_span`, `record_turn_metrics`, `set_turn_max_tool_turns_error` |
+| Metrics | `record_llm_call`, `record_llm_latency`, `record_tool_call`, `record_turn_count` |
+| Logs | `emit_log`, `log_info`, `log_warn`, `log_error` |
 
 ## Instrumentation Guide
 
@@ -69,33 +81,14 @@ See [docs/instrumentation.md](docs/instrumentation.md) for a step-by-step guide 
 
 ## Flushing and Shutting Down
 
-`SdkTracerProvider::force_flush` and `shutdown` return `OTelSdkResult`. The library intentionally leaves error handling to the application so you can decide whether to log, retry, or abort.
-
-A minimal CLI pattern is to print export failures to stdout:
+`TelemetryProviders` exposes `force_flush()` and `shutdown()` methods that flush/shutdown all three providers (traces, metrics, logs) and print any errors to stdout.
 
 ```moonbit
-fn format_error(err : @error.OTelSdkError) -> String {
-  match err {
-    AlreadyShutdown => "AlreadyShutdown"
-    Timeout(ms) => "Timeout(\{ms}ms)"
-    InvalidArgument(msg) => "InvalidArgument(\{msg})"
-    InternalFailure(msg) => "InternalFailure(\{msg})"
-    ExportFailure(name, msg) => "ExportFailure(\{name}, \{msg})"
-  }
-}
-
-match provider.force_flush() {
-  Ok(_) => ()
-  Err(err) => @stdio.stdout.write("Telemetry flush failed: " + format_error(err) + "\n")
-}
-
-match provider.shutdown() {
-  Ok(_) => ()
-  Err(err) => @stdio.stdout.write("Telemetry shutdown failed: " + format_error(err) + "\n")
-}
+providers.force_flush()
+providers.shutdown()
 ```
 
-Always call `shutdown` before the process exits so pending spans are exported.
+Always call `shutdown` before the process exits so pending telemetry is exported.
 
 ## ID Generator Option
 

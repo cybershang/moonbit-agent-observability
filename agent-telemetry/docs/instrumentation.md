@@ -15,7 +15,7 @@ In your chat client, wrap the HTTP request in a `gen_ai.chat` span:
 
 ```moonbit
 async fn chat(
-  messages : Array[Message],
+  messages : Array<Message>,
   parent_context? : @context.Context = @context.Context::empty(),
 ) -> LLMResponse {
   let tracer = @telemetry.tracer("my-agent/llm")
@@ -25,6 +25,8 @@ async fn chat(
     model="step-3.7-flash",
     max_tokens=1024,
     input_messages~,        // optional: capture input messages
+    server_address~,        // optional: server.address attribute
+    server_port~,           // optional: server.port attribute
     parent_context~,        // optional: continue an existing trace
   )
 
@@ -47,7 +49,7 @@ async fn chat(
 }
 ```
 
-This produces a span named `gen_ai.chat` with attributes such as `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.usage.input_tokens`, and `gen_ai.response.id`.
+This produces a span named `gen_ai.chat` with attributes such as `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.usage.input_tokens`, and `gen_ai.response.id`. On HTTP failure it also sets `error.type` to the status code string.
 
 ## Instrumenting Tool Execution
 
@@ -109,3 +111,74 @@ The `parent_context` is passed to the LLM chat request and each tool execution, 
 ## Propagating Trace Context
 
 Always pass `parent_context=span.context()` when a function calls another instrumented function. This links the child span to the parent span and produces a single coherent trace. If no parent is available, the helpers default to an empty context.
+
+## Recording Metrics
+
+Get a `Meter` for your scope and call the semantic metric functions:
+
+```moonbit
+let meter = @telemetry.meter("my-agent/llm")
+
+@telemetry.record_llm_latency(meter, "stepfun", "step-3.7-flash", seconds=0.85)
+@telemetry.record_llm_token_usage(meter, "stepfun", "step-3.7-flash", "input", 100L)
+@telemetry.record_llm_token_usage(meter, "stepfun", "step-3.7-flash", "output", 25L)
+```
+
+The following metrics are emitted:
+
+| Metric | Type | Labels |
+|---|---|---|
+| `gen_ai.client.operation.duration` | Histogram | `gen_ai.operation.name`, `gen_ai.provider.name`, `gen_ai.request.model` |
+| `gen_ai.client.token.usage` | Histogram | `gen_ai.operation.name`, `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.token.type` |
+| `agent.tool.calls_total` | Counter | `gen_ai.tool.name`, `success` |
+| `agent.turn.total` | Counter | `max_tool_turns_reached` |
+
+## Recording Logs
+
+Use severity helpers or the generic `emit_log` function:
+
+```moonbit
+@telemetry.log_info("my-agent", "agent started")
+@telemetry.log_error(
+  "my-agent/llm",
+  "LLM request failed with status 401",
+  trace_context=Some(span.span_context()),
+)
+```
+
+When `trace_context` is provided, the log record is linked to the active trace/span.
+
+To record conversation messages in a format compatible with the `genai-observability` GreptimeDB dashboard SQL:
+
+```moonbit
+@telemetry.log_conversation_message(
+  "my-agent/llm",
+  "user",
+  "What is GreptimeDB?",
+  trace_context=Some(span.span_context()),
+)
+
+@telemetry.log_conversation_message(
+  "my-agent/llm",
+  "assistant",
+  "GreptimeDB is a time-series database.",
+  index=0,
+  trace_context=Some(span.span_context()),
+)
+```
+
+Body JSON shapes:
+
+- `user` / `tool`: `{"content":"..."}`
+- `assistant`: `{"index":0,"message":{"role":"assistant","content":"..."}}`
+
+## GreptimeDB Integration
+
+When exporting to GreptimeDB via OTLP/HTTP, the library automatically adds Greptime-specific headers when the corresponding environment variables are set:
+
+| Variable | Default | Header |
+|---|---|---|
+| `GREPTIME_TRACE_PIPELINE` | `greptime_trace_v1` | `x-greptime-pipeline-name` |
+| `GREPTIME_LOG_TABLE` | *(empty, header omitted)* | `x-greptime-log-table-name` |
+
+Values are read via `env_with_dotenv`, which checks the process environment first and then the `.env` file in the working directory.

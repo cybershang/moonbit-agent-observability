@@ -6,9 +6,9 @@ async fn main {
   let ask = parse_ask_arg()
   let settings = @agent.Settings::from_env()
 
-  // Initialize the global OpenTelemetry tracer provider from env.
+  // Initialize the global OpenTelemetry providers from env.
   // Use ProcessUniqueRandom to avoid duplicate trace/span IDs across restarts.
-  let provider = @telemetry.init_from_env(
+  let providers = @telemetry.init_from_env(
     service_name="agent-observability",
     id_generator=@telemetry.ProcessUniqueRandom,
   )
@@ -21,105 +21,40 @@ async fn main {
     max_tool_turns=settings.max_tool_turns,
   )
 
-  match ask {
-    Some(query) => {
-      // Non-interactive mode: run a single turn and exit.
-      let turn = agent.run(query)
-      print_turn(turn)
-      flush_provider(provider)
-      shutdown_provider(provider)
-    }
-    None => {
-      // REPL with continuous dialogue
-      while true {
-        @stdio.stdout.write("> ")
-        let prompt = match @stdio.stdin.read_until("\n") {
-          Some(line) => line.trim(char_set="\r\n").to_owned()
-          None => break
-        }
-        if prompt == "exit" || prompt == "quit" {
-          break
-        }
+  @async.with_task_group(group => {
+    // Metrics and logs need background tasks to flush periodically.
+    providers.spawn_background_tasks(group)
 
-        let turn = agent.run(prompt)
+    match ask {
+      Some(query) => {
+        // Non-interactive mode: run a single turn and exit.
+        let turn = agent.run(query)
         print_turn(turn)
-
-        // Ensure spans are flushed to the OTLP collector after each turn.
-        // This is especially important for the batch exporter so telemetry
-        // is not lost when the process exits shortly after the loop.
-        flush_provider(provider)
+        providers.force_flush()
       }
+      None =>
+        // REPL with continuous dialogue
+        while true {
+          @stdio.stdout.write("> ")
+          let prompt = match @stdio.stdin.read_until("\n") {
+            Some(line) => line.trim(char_set="\r\n").to_owned()
+            None => break
+          }
+          if prompt == "exit" || prompt == "quit" {
+            break
+          }
 
-      // Gracefully shut down the tracer provider so pending spans are exported.
-      shutdown_provider(provider)
+          let turn = agent.run(prompt)
+          print_turn(turn)
+
+          // Ensure spans/metrics/logs are flushed after each turn.
+          providers.force_flush()
+        }
     }
-  }
-}
 
-///|
-/// Format an OpenTelemetry SDK error for user-visible logging.
-fn format_otel_error(err : @error.OTelSdkError) -> String {
-  match err {
-    AlreadyShutdown => "AlreadyShutdown"
-    Timeout(ms) => "Timeout(\{ms}ms)"
-    InvalidArgument(msg) => "InvalidArgument(\{msg})"
-    InternalFailure(msg) => "InternalFailure(\{msg})"
-    ExportFailure(name, msg) => "ExportFailure(\{name}, \{msg})"
-  }
-}
-
-///|
-/// Check whether an OTLP error is caused by the collector being unreachable.
-fn is_connection_failure(err : @error.OTelSdkError) -> Bool {
-  let text = format_otel_error(err).to_lower()
-  text.contains("connection refused") ||
-  text.contains("connection reset") ||
-  text.contains("timeout") ||
-  text.contains("oserror")
-}
-
-///|
-/// Return a friendly hint for common OTLP export failures.
-fn otlp_failure_hint(err : @error.OTelSdkError) -> String {
-  if is_connection_failure(err) {
-    "Hint: the OTLP endpoint is unreachable. Check OTEL_EXPORTER_OTLP_ENDPOINT or start the OpenTelemetry collector. Telemetry spans will be discarded, but the agent will continue running."
-  } else {
-    ""
-  }
-}
-
-///|
-/// Flush the provider and print any export error so telemetry issues are visible.
-async fn flush_provider(provider : @sdktrace.SdkTracerProvider) -> Unit {
-  match provider.force_flush() {
-    Ok(_) => ()
-    Err(err) => {
-      @stdio.stdout.write(
-        "[Telemetry] force_flush failed: " + format_otel_error(err) + "\n",
-      )
-      let hint = otlp_failure_hint(err)
-      if hint != "" {
-        @stdio.stdout.write("[Telemetry] " + hint + "\n")
-      }
-    }
-  }
-}
-
-///|
-/// Shut down the provider and print any export error.
-async fn shutdown_provider(provider : @sdktrace.SdkTracerProvider) -> Unit {
-  match provider.shutdown() {
-    Ok(_) => ()
-    Err(err) => {
-      @stdio.stdout.write(
-        "[Telemetry] shutdown failed: " + format_otel_error(err) + "\n",
-      )
-      let hint = otlp_failure_hint(err)
-      if hint != "" {
-        @stdio.stdout.write("[Telemetry] " + hint + "\n")
-      }
-    }
-  }
+    // Gracefully shut down all providers so pending telemetry is exported.
+    providers.shutdown()
+  })
 }
 
 ///|

@@ -1,0 +1,52 @@
+services:
+  greptimedb:
+    image: greptime/greptimedb:latest
+    command: standalone start --http-addr=0.0.0.0:4000 --rpc-addr=0.0.0.0:4001 --mysql-addr=0.0.0.0:4002
+    ports:
+      - "4000:4000"
+      - "4001:4001"
+      - "4002:4002"
+    networks:
+      - greptime-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:4000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  grafana:
+    image: greptime/grafana-greptimedb:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    depends_on:
+      greptimedb:
+        condition: service_healthy
+    networks:
+      - greptime-network
+
+  init-flow:
+    image: curlimages/curl:8.12.1
+    volumes:
+      - ./init-flow.sh:/init-flow.sh:ro
+      - ./flows.sql:/flows.sql:ro
+    entrypoint: ["/bin/sh", "/init-flow.sh"]
+    environment:
+      GREPTIME_URL: http://greptimedb:4000
+    depends_on:
+      greptimedb:
+        condition: service_healthy
+    networks:
+      - greptime-network
+    restart: "no"
+    profiles:
+      - load
+
+networks:
+  greptime-network:

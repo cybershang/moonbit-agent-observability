@@ -6,6 +6,7 @@ _build/
 
 # Dependency cache
 .mooncakes/
+.repos/
 
 # IDE / editor
 .reasonix/

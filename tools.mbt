@@ -68,6 +68,7 @@ pub async fn execute_tool(
   parent_context? : @context.Context = @context.Context::empty(),
 ) -> String {
   let tracer = @telemetry.tracer("cybershang/agent-observability/tools")
+  let meter = @telemetry.meter("cybershang/agent-observability/tools")
   let span = @telemetry.start_tool_span(
     tracer,
     name,
@@ -78,6 +79,16 @@ pub async fn execute_tool(
   let result = match tool_registry.get(name) {
     Some(handler) => handler(arguments)
     None => "{\"error\": \"Unknown tool: " + name + "\"}"
+  }
+
+  let success = !result.contains("\"error\"")
+  @telemetry.record_tool_call(meter, name, success~)
+  if !success {
+    @telemetry.log_error(
+      "cybershang/agent-observability/tools",
+      "Tool \{name} returned error: " + result,
+      trace_context=Some(span.span_context()),
+    )
   }
 
   @telemetry.record_tool_result(span, result)

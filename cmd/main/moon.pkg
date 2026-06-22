@@ -4,8 +4,6 @@ import {
   "moonbitlang/async",
   "moonbitlang/async/stdio",
   "moonbitlang/core/argparse",
-  "moonbit-community/opentelemetry/sdk/error",
-  "moonbit-community/opentelemetry/sdk/trace" @sdktrace,
 }
 
 options(
