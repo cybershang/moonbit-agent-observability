@@ -132,15 +132,15 @@ let span = @telemetry.start_span(tracer, "my.step")
 
 The `agent-observability` sample application records a small set of `app.*` attributes on top of the standard GenAI ones. Each `Agent::run` invocation starts its own root `agent.turn` span, so every turn is an independent trace; the attributes below live on that turn and its children:
 
-| Span | Attribute | Type | Meaning |
-|---|---|---|---|
-| `agent.turn` | `app.conversation.history_messages` | int64 | History length before this turn |
-| `agent.turn` | `app.agent.tool_count` | int64 | Tools available to the agent |
-| `gen_ai.chat` | `app.llm.capture_content` | bool | Whether this client captures content |
-| `gen_ai.chat` | `app.llm.tools_enabled` | bool | Whether tools were sent in the request |
-| `gen_ai.chat` | `app.llm.messages.count` | int64 | Number of messages in the request |
-| `gen_ai.tool.execution` | `app.tool.arguments_length` | int64 | Length of the JSON arguments string |
-| `gen_ai.tool.execution` | `app.tool.unknown` | bool | Whether the requested tool is unknown |
+| Span | Attribute | Type | Meaning | Good for aggregation |
+|---|---|---|---|---|
+| `agent.turn` | `app.agent.tool_count` | int64 | Tools available to the agent | latest value / big number display |
+| `agent.turn` | `app.prompt.length` | int64 | User prompt length | avg / p95 / histogram |
+| `agent.turn` | `app.response.length` | int64 | Final reply length | avg / p95 / histogram |
+| `agent.turn` | `app.agent.reached_max_turns` | bool | Whether max_tool_turns was hit | count of `true` |
+| `gen_ai.chat` | `app.llm.capture_content` | bool | Whether this client captures content | toggle / last value display |
+| `gen_ai.chat` | `app.llm.tool_calls.count` | int64 | Number of tool calls in the response | avg / sum / max |
+| `gen_ai.tool.execution` | `app.tool.result.length` | int64 | Length of the tool result JSON string | avg / p95 / histogram |
 
 These attributes are set with the typed helpers shown above, so they are easy to query in GreptimeDB / Grafana alongside the built-in GenAI attributes.
 

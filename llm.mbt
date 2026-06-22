@@ -145,16 +145,6 @@ pub async fn Client::chat(
     "app.llm.capture_content",
     self.capture_content,
   )
-  @telemetry.set_bool_attribute(
-    span,
-    "app.llm.tools_enabled",
-    !tools.is_empty(),
-  )
-  @telemetry.set_int_attribute(
-    span,
-    "app.llm.messages.count",
-    messages.length().to_int64(),
-  )
 
   let body_json = build_request_json(
     messages,
@@ -218,6 +208,11 @@ pub async fn Client::chat(
 
   let data = resp_body.json()
   let llm_resp = parse_llm_response(data)
+  @telemetry.set_int_attribute(
+    span,
+    "app.llm.tool_calls.count",
+    llm_resp.tool_calls.length().to_int64(),
+  )
 
   // Extract usage from response if available and record metrics.
   let usage = if data is { "usage": usage_obj, .. } {

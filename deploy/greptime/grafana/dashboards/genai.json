@@ -1352,7 +1352,7 @@
         {
           "refId": "Trace ID",
           "editorType": "code",
-          "rawSql": "SELECT trace_id, span_id, parent_span_id, service_name, span_name, CAST(timestamp AS INT64) / 1000000 as ts_ms, CAST(duration_nano AS FLOAT64) / 1000000 as dur_ms, json_to_string(span_events) as span_events, \"span_attributes.gen_ai.provider.name\", \"span_attributes.gen_ai.operation.name\", \"span_attributes.gen_ai.request.model\", \"span_attributes.gen_ai.request.max_tokens\", \"span_attributes.server.address\", span_status_code, \"span_attributes.gen_ai.input.messages\", \"span_attributes.gen_ai.output.messages\", \"span_attributes.gen_ai.tool.name\", \"span_attributes.gen_ai.tool.call.arguments\", \"span_attributes.gen_ai.tool.call.result\", \"resource_attributes.telemetry.sdk.name\", \"resource_attributes.telemetry.sdk.language\", \"resource_attributes.telemetry.sdk.version\" FROM opentelemetry_traces WHERE timestamp >= $__fromTime AND timestamp <= $__toTime AND trace_id = COALESCE(NULLIF(${trace_id:sqlstring}, ''), (SELECT trace_id FROM opentelemetry_traces WHERE timestamp >= $__fromTime AND timestamp <= $__toTime ORDER BY timestamp DESC LIMIT 1)) ORDER BY timestamp",
+          "rawSql": "SELECT trace_id, span_id, parent_span_id, service_name, span_name, CAST(timestamp AS INT64) / 1000000 as ts_ms, CAST(duration_nano AS FLOAT64) / 1000000 as dur_ms, json_to_string(span_events) as span_events, \"span_attributes.gen_ai.provider.name\", \"span_attributes.gen_ai.operation.name\", \"span_attributes.gen_ai.request.model\", \"span_attributes.gen_ai.request.max_tokens\", \"span_attributes.server.address\", span_status_code, \"span_attributes.gen_ai.input.messages\", \"span_attributes.gen_ai.output.messages\", \"span_attributes.gen_ai.tool.name\", \"span_attributes.gen_ai.tool.call.arguments\", \"span_attributes.gen_ai.tool.call.result\", \"span_attributes.app.agent.tool_count\", \"span_attributes.app.prompt.length\", \"span_attributes.app.response.length\", \"span_attributes.app.agent.reached_max_turns\", \"span_attributes.app.llm.capture_content\", \"span_attributes.app.llm.tool_calls.count\", \"span_attributes.app.tool.result.length\", \"resource_attributes.telemetry.sdk.name\", \"resource_attributes.telemetry.sdk.language\", \"resource_attributes.telemetry.sdk.version\" FROM opentelemetry_traces WHERE timestamp >= $__fromTime AND timestamp <= $__toTime AND trace_id = COALESCE(NULLIF(${trace_id:sqlstring}, ''), (SELECT trace_id FROM opentelemetry_traces WHERE timestamp >= $__fromTime AND timestamp <= $__toTime ORDER BY timestamp DESC LIMIT 1)) ORDER BY timestamp",
           "builderOptions": {
             "database": "public",
             "table": "opentelemetry_traces",
@@ -1434,6 +1434,34 @@
                 "hint": "trace_tags"
               },
               {
+                "name": "span_attributes.app.agent.tool_count",
+                "hint": "trace_tags"
+              },
+              {
+                "name": "span_attributes.app.prompt.length",
+                "hint": "trace_tags"
+              },
+              {
+                "name": "span_attributes.app.response.length",
+                "hint": "trace_tags"
+              },
+              {
+                "name": "span_attributes.app.agent.reached_max_turns",
+                "hint": "trace_tags"
+              },
+              {
+                "name": "span_attributes.app.llm.capture_content",
+                "hint": "trace_tags"
+              },
+              {
+                "name": "span_attributes.app.llm.tool_calls.count",
+                "hint": "trace_tags"
+              },
+              {
+                "name": "span_attributes.app.tool.result.length",
+                "hint": "trace_tags"
+              },
+              {
                 "name": "resource_attributes.telemetry.sdk.name",
                 "hint": "trace_service_tags"
               },
@@ -1454,6 +1482,321 @@
           }
         }
       ]
+    },
+    {
+      "type": "row",
+      "title": "Application Attributes",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 102
+      },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Registered Tools",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 103
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_GREPTIMEDB}"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "rawSql": "SELECT `span_attributes.app.agent.tool_count` AS tool_count FROM opentelemetry_traces WHERE span_name = 'agent.turn' AND `span_attributes.app.agent.tool_count` IS NOT NULL ORDER BY timestamp DESC LIMIT 1",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "none"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Capture Content",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 103
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_GREPTIMEDB}"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "rawSql": "SELECT `span_attributes.app.llm.capture_content` AS capture_content FROM opentelemetry_traces WHERE span_name = 'gen_ai.chat' AND `span_attributes.app.llm.capture_content` IS NOT NULL ORDER BY timestamp DESC LIMIT 1",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "index": 0,
+                  "text": "Off"
+                },
+                "1": {
+                  "color": "green",
+                  "index": 1,
+                  "text": "On"
+                },
+                "false": {
+                  "color": "red",
+                  "index": 2,
+                  "text": "Off"
+                },
+                "true": {
+                  "color": "green",
+                  "index": 3,
+                  "text": "On"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "none"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Reached Max Turns",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 103
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_GREPTIMEDB}"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "rawSql": "SELECT COUNT(*) AS count FROM opentelemetry_traces WHERE span_name = 'agent.turn' AND `span_attributes.app.agent.reached_max_turns` = true AND $__timeFilter(timestamp)",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "none"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Avg Tool Calls / Response",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 103
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_GREPTIMEDB}"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "rawSql": "SELECT ROUND(AVG(`span_attributes.app.llm.tool_calls.count`), 2) AS avg_tool_calls FROM opentelemetry_traces WHERE span_name = 'gen_ai.chat' AND `span_attributes.app.llm.tool_calls.count` IS NOT NULL AND $__timeFilter(timestamp)",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "purple"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "none"
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Prompt & Response Length Trend",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 107
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_GREPTIMEDB}"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "rawSql": "SELECT date_bin('1 minute'::INTERVAL, timestamp) AS time, ROUND(AVG(`span_attributes.app.prompt.length`), 0) AS avg_prompt_length, ROUND(AVG(`span_attributes.app.response.length`), 0) AS avg_response_length FROM opentelemetry_traces WHERE span_name = 'agent.turn' AND $__timeFilter(timestamp) GROUP BY time ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "avg_prompt_length"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "avg_response_length"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Tool Result Length Trend",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 107
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_GREPTIMEDB}"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "rawSql": "SELECT date_bin('1 minute'::INTERVAL, timestamp) AS time, ROUND(AVG(`span_attributes.app.tool.result.length`), 0) AS avg_result_length FROM opentelemetry_traces WHERE span_name = 'gen_ai.tool.execution' AND $__timeFilter(timestamp) GROUP BY time ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "stacking": {
+              "mode": "none"
+            }
+          },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      }
     }
   ],
   "schemaVersion": 39,

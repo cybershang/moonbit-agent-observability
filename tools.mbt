@@ -76,21 +76,15 @@ pub async fn execute_tool(
     parent_context~,
   )
 
-  @telemetry.set_int_attribute(
-    span,
-    "app.tool.arguments_length",
-    arguments.length().to_int64(),
-  )
-  @telemetry.set_bool_attribute(
-    span,
-    "app.tool.unknown",
-    tool_registry.get(name) is None,
-  )
-
   let result = match tool_registry.get(name) {
     Some(handler) => handler(arguments)
     None => "{\"error\": \"Unknown tool: " + name + "\"}"
   }
+  @telemetry.set_int_attribute(
+    span,
+    "app.tool.result.length",
+    result.length().to_int64(),
+  )
 
   let success = !result.contains("\"error\"")
   @telemetry.record_tool_call(meter, name, success~)

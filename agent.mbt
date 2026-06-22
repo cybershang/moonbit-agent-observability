@@ -58,13 +58,13 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
 
   @telemetry.set_int_attribute(
     span,
-    "app.conversation.history_messages",
-    self.messages.length().to_int64(),
+    "app.agent.tool_count",
+    self.tools.length().to_int64(),
   )
   @telemetry.set_int_attribute(
     span,
-    "app.agent.tool_count",
-    self.tools.length().to_int64(),
+    "app.prompt.length",
+    prompt.length().to_int64(),
   )
 
   self.messages.push(Message::new(content=Some(prompt)))
@@ -117,6 +117,15 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
       trace_context=Some(span.span_context()),
     )
   }
+
+  @telemetry.set_int_attribute(
+    span,
+    "app.response.length",
+    final_reply.length().to_int64(),
+  )
+  @telemetry.set_bool_attribute(
+    span, "app.agent.reached_max_turns", has_tool_calls,
+  )
 
   @telemetry.record_turn_metrics(span, turn, executed.length(), final_reply)
   @telemetry.record_turn_count(meter, max_tool_turns_reached=has_tool_calls)
