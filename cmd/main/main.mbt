@@ -21,6 +21,18 @@ async fn main {
     max_tool_turns=settings.max_tool_turns,
   )
 
+  // Emit a registration log for every known tool. The dashboard uses these
+  // logs to build the complete tool list (including zero-call tools).
+  for tool in @agent.tools {
+    @telemetry.log_info(
+      "cybershang/agent-observability/tools",
+      "Tool registered",
+      attributes=[
+        @common.KeyValue::new("gen_ai.tool.name", String(tool.name)),
+      ],
+    )
+  }
+
   @async.with_task_group(group => {
     // Metrics and logs need background tasks to flush periodically.
     providers.spawn_background_tasks(group)

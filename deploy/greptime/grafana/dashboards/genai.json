@@ -1519,6 +1519,40 @@
       }
     },
     {
+      "type": "table",
+      "title": "Tool Call Statistics",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 107
+      },
+      "datasource": {
+        "type": "mysql",
+        "uid": "${DS_GREPTIMEDB}"
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "rawSql": "WITH registered_tools AS (SELECT DISTINCT json_get_string(log_attributes, '$.\"gen_ai.tool.name\"') AS tool FROM opentelemetry_logs WHERE body = 'Tool registered' AND scope_name = 'cybershang/agent-observability/tools') SELECT r.tool AS Tool, COUNT(t.span_id) AS Calls, ROUND(AVG(t.duration_nano) / 1000000.0, 2) AS `Avg Duration (ms)` FROM registered_tools r LEFT JOIN opentelemetry_traces t ON t.span_name = 'gen_ai.tool.execution' AND t.`span_attributes.gen_ai.tool.name` = r.tool AND $__timeFilter(t.timestamp) GROUP BY r.tool ORDER BY Calls DESC",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
       "type": "stat",
       "title": "Capture Content",
       "gridPos": {
@@ -1682,7 +1716,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 107
+        "y": 115
       },
       "datasource": {
         "type": "mysql",
@@ -1749,7 +1783,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 107
+        "y": 115
       },
       "datasource": {
         "type": "mysql",
