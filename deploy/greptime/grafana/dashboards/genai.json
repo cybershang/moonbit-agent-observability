@@ -737,7 +737,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "rawSql": "SELECT f.time_window AS time, f.model, ROUND((f.total_input_tokens * p.input_price_rmb_per_1m + f.total_output_tokens * p.output_price_rmb_per_1m) / 1000000 / GREATEST(f.request_count, 1), 6) AS cost_per_request FROM genai_token_usage_1m f JOIN model_pricing p ON f.model = p.model WHERE $__timeFilter(f.time_window) GROUP BY f.time_window, f.model ORDER BY f.time_window",
+          "rawSql": "SELECT f.time_window AS time, f.model, ROUND((f.total_input_tokens * p.input_price_rmb_per_1m + f.total_output_tokens * p.output_price_rmb_per_1m) / 1000000 / GREATEST(f.request_count, 1), 6) AS cost_per_request FROM genai_token_usage_1m f JOIN model_pricing p ON f.model = p.model WHERE $__timeFilter(f.time_window) ORDER BY f.time_window",
           "format": "time_series",
           "refId": "A"
         }
