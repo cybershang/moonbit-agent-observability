@@ -275,7 +275,7 @@ pub async fn Client::chat(
     }
   }
 
-  @telemetry.end_span_ok(span)
+  @telemetry.end_span(span)
 
   llm_resp
 }

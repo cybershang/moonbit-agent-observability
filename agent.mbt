@@ -118,8 +118,8 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
   @telemetry.set_bool(span, "app.agent.reached_max_turns", has_tool_calls)
 
   @telemetry.set_turn(span, turn, executed.length(), final_reply)
-  @telemetry.record_turn_count(meter, max_tool_turns_reached=has_tool_calls)
-  @telemetry.end_span_ok(span)
+  @telemetry.record_turn(meter, max_tool_turns_reached=has_tool_calls)
+  @telemetry.end_span(span)
 
   { reply: final_reply, tool_calls: executed }
 }
