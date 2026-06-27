@@ -215,23 +215,33 @@ pub async fn Client::chat(
   }
   match usage {
     Some(u) => {
-      @telemetry.set_chat_usage(span, u)
-      if u is { "prompt_tokens": Number(pt, ..), .. } {
-        @telemetry.record_llm_token_usage(
+      let pt = if u is { "prompt_tokens": Number(v, ..), .. } {
+        v.to_int64()
+      } else {
+        0L
+      }
+      let ct = if u is { "completion_tokens": Number(v, ..), .. } {
+        v.to_int64()
+      } else {
+        0L
+      }
+      @telemetry.set_usage(span, pt, ct)
+      if pt > 0L {
+        @telemetry.record_usage(
           meter,
           self.provider_name,
           self.model,
           "input",
-          pt.to_int64(),
+          pt,
         )
       }
-      if u is { "completion_tokens": Number(ct, ..), .. } {
-        @telemetry.record_llm_token_usage(
+      if ct > 0L {
+        @telemetry.record_usage(
           meter,
           self.provider_name,
           self.model,
           "output",
-          ct.to_int64(),
+          ct,
         )
       }
     }
@@ -244,7 +254,7 @@ pub async fn Client::chat(
   } else {
     None
   }
-  @telemetry.set_chat_response(span, data, output_messages~)
+  @telemetry.set_response(span, data, output_messages~)
 
   // Log output conversation messages when content capture is enabled.
   if self.capture_content {
