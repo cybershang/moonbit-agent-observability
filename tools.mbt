@@ -165,16 +165,13 @@ async fn qweather_get(path : String) -> (@http.Response, Json) {
     full_path = full_path + "&key=" + url_encode(api_key)
   } else {
     return (
-      {
-        code: 401,
-        reason: "Unauthorized",
-        headers: {},
-        cookies: [],
-      },
-      Json::object({ "error": "QWEATHER_TOKEN or QWEATHER_API_KEY not configured".to_json() }),
+      { code: 401, reason: "Unauthorized", headers: {}, cookies: [] },
+      Json::object({
+        "error": "QWEATHER_TOKEN or QWEATHER_API_KEY not configured".to_json(),
+      }),
     )
   }
-  let (response, body) = @http.get(host + full_path, headers=headers)
+  let (response, body) = @http.get(host + full_path, headers~)
   (response, body.json())
 }
 
@@ -214,11 +211,17 @@ async fn lookup_city(args_json : String) -> String {
     let adm1 = if loc is { "adm1": String(a), .. } { a } else { "" }
     let adm2 = if loc is { "adm2": String(a), .. } { a } else { "" }
     let country = if loc is { "country": String(c), .. } { c } else { "" }
-    "{\"name\":\"" + escape_json(name) +
-    "\",\"id\":\"" + escape_json(id) +
-    "\",\"adm1\":\"" + escape_json(adm1) +
-    "\",\"adm2\":\"" + escape_json(adm2) +
-    "\",\"country\":\"" + escape_json(country) + "\"}"
+    "{\"name\":\"" +
+    escape_json(name) +
+    "\",\"id\":\"" +
+    escape_json(id) +
+    "\",\"adm1\":\"" +
+    escape_json(adm1) +
+    "\",\"adm2\":\"" +
+    escape_json(adm2) +
+    "\",\"country\":\"" +
+    escape_json(country) +
+    "\"}"
   })
   "[\{candidates.join(",")}]"
 }

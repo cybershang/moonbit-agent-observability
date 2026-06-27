@@ -35,7 +35,9 @@ async test "Agent end-to-end smoke test with weather tool call" {
   })
   assert_true(weather_calls.length() > 0)
   assert_true(
-    weather_calls.any(fn(r) { r.call.name == "lookup_city" && r.call.arguments.contains("北京") }),
+    weather_calls.any(fn(r) {
+      r.call.name == "lookup_city" && r.call.arguments.contains("北京")
+    }),
   )
 
   // Verify a final text reply was produced.
