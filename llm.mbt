@@ -140,11 +140,7 @@ pub async fn Client::chat(
     parent_context~,
   )
 
-  @telemetry.set_bool_attribute(
-    span,
-    "app.llm.capture_content",
-    self.capture_content,
-  )
+  @telemetry.set_bool(span, "app.llm.capture_content", self.capture_content)
 
   let body_json = build_request_json(
     messages,
@@ -208,7 +204,7 @@ pub async fn Client::chat(
 
   let data = resp_body.json()
   let llm_resp = parse_llm_response(data)
-  @telemetry.set_int_attribute(
+  @telemetry.set_int(
     span,
     "app.llm.tool_calls.count",
     llm_resp.tool_calls.length().to_int64(),
@@ -222,7 +218,7 @@ pub async fn Client::chat(
   }
   match usage {
     Some(u) => {
-      @telemetry.record_chat_usage(span, u)
+      @telemetry.set_chat_usage(span, u)
       if u is { "prompt_tokens": Number(pt, ..), .. } {
         @telemetry.record_llm_token_usage(
           meter,
@@ -251,7 +247,7 @@ pub async fn Client::chat(
   } else {
     None
   }
-  @telemetry.record_chat_response(span, data, output_messages~)
+  @telemetry.set_chat_response(span, data, output_messages~)
 
   // Log output conversation messages when content capture is enabled.
   if self.capture_content {

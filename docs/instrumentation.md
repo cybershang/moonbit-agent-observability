@@ -47,6 +47,8 @@ fn get_agent_tracer() -> @trace.Tracer {
 
 ### 2.2 上下文传递
 
+MoonBit 没有隐式的异步上下文存储（async local storage），因此 trace context 必须作为显式参数逐层传递。这一设计也符合 **explicit is better than implicit** 的理念——函数的签名直接表明它依赖外部上下文，调用链路清晰可追踪。
+
 `Agent::run` 创建 span 后，提取其上下文作为后续调用的 `parent_context`：
 
 ```moonbit

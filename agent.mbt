@@ -54,18 +54,15 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
     prompt,
     self.max_tool_turns,
   )
+  // No async context storage by design — explicit is better than implicit.
   let parent_context = span.context()
 
-  @telemetry.set_int_attribute(
+  @telemetry.set_int(
     span,
     "app.agent.tool_count",
     self.tools.length().to_int64(),
   )
-  @telemetry.set_int_attribute(
-    span,
-    "app.prompt.length",
-    prompt.length().to_int64(),
-  )
+  @telemetry.set_int(span, "app.prompt.length", prompt.length().to_int64())
 
   self.messages.push(Message::new(content=Some(prompt)))
 
@@ -110,24 +107,17 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
   // If we hit the turn limit without a final reply, report it
   if has_tool_calls {
     final_reply = "[Agent reached maximum tool-call turns without producing a final reply.]"
-    @telemetry.set_turn_max_tool_turns_error(span)
-    @telemetry.log_error(
-      "cybershang/agent-observability/agent",
-      "Agent reached max_tool_turns without final reply",
-      trace_context=Some(span.span_context()),
-    )
+    @telemetry.set_turn_exhausted(span)
   }
 
-  @telemetry.set_int_attribute(
+  @telemetry.set_int(
     span,
     "app.response.length",
     final_reply.length().to_int64(),
   )
-  @telemetry.set_bool_attribute(
-    span, "app.agent.reached_max_turns", has_tool_calls,
-  )
+  @telemetry.set_bool(span, "app.agent.reached_max_turns", has_tool_calls)
 
-  @telemetry.record_turn_metrics(span, turn, executed.length(), final_reply)
+  @telemetry.set_turn(span, turn, executed.length(), final_reply)
   @telemetry.record_turn_count(meter, max_tool_turns_reached=has_tool_calls)
   @telemetry.end_span_ok(span)
 
