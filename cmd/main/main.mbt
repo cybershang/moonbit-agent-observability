@@ -6,8 +6,9 @@ async fn main {
   let ask = parse_ask_arg()
   let settings = @agent.Settings::from_env()
 
-  // Initialize the global OpenTelemetry providers from env.
-  // Use ProcessUniqueRandom to avoid duplicate trace/span IDs across restarts.
+  // Initialize agent-telemetry instrumentation from env (wraps OpenTelemetry SDK
+  // setup: resource, exporter, provider). Use ProcessUniqueRandom to avoid
+  // duplicate trace/span IDs across restarts.
   let providers = @telemetry.init_from_env(
     service_name="agent-observability",
     id_generator=@telemetry.ProcessUniqueRandom,
@@ -27,9 +28,7 @@ async fn main {
     @telemetry.log_info(
       "cybershang/agent-observability/tools",
       "Tool registered",
-      attributes=[
-        @common.KeyValue::new("gen_ai.tool.name", String(tool.name)),
-      ],
+      attributes=[@common.KeyValue::new("gen_ai.tool.name", String(tool.name))],
     )
   }
 
