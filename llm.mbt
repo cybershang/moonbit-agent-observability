@@ -183,16 +183,13 @@ pub async fn Client::chat(
   )
 
   guard response.code == 200 else {
-    @telemetry.set_chat_http_error(span, response.code)
+    @telemetry.set_http_error(span, response.code)
     @telemetry.log_error(
       "cybershang/agent-observability/llm",
       "LLM request failed with status \{response.code}",
       trace_context=Some(span.span_context()),
     )
-    @telemetry.end_span_error(
-      span,
-      description="LLM request failed with status: \{response.code}",
-    )
+    @telemetry.end_span(span)
     return {
       content: Some("[LLM request failed with status \{response.code}]"),
       tool_calls: [],
