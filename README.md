@@ -278,8 +278,8 @@ let span = @telemetry.start_chat_span(
   max_tokens=1024,
 )
 // ... 发起 HTTP 请求、拿到响应 ...
-@telemetry.record_chat_response(span, response_json)
-@telemetry.end_span_ok(span)
+@telemetry.set_response(span, response_json)
+@telemetry.end_span(span)
 ```
 
 ### 提供的语义 helper
@@ -287,10 +287,10 @@ let span = @telemetry.start_chat_span(
 | 场景 | 主要函数 | 说明 |
 |---|---|---|
 | Provider 初始化 | `init_from_env` / `init_telemetry` | 环境变量一键启动；显式选择 exporter 与 `IdGeneratorOption` |
-| 通用 span 生命周期 | `start_span` / `end_span` / `end_span_ok` / `end_span_error` | 薄封装，管理 tracer 缓存和 span 状态 |
-| LLM chat | `start_chat_span` / `record_chat_usage` / `record_chat_response` / `set_chat_http_error` | 按 OTel GenAI semantic conventions 设置属性 |
-| Tool 执行 | `start_tool_span` / `record_tool_result` / `set_tool_error` | 记录工具名、参数、结果、错误 |
-| Agent turn | `start_agent_turn_span` / `record_turn_metrics` / `set_turn_max_tool_turns_error` | 记录输入/输出、轮数、工具调用次数 |
+| 通用 span 生命周期 | `start_span` / `end_span` | 薄封装，管理 tracer 缓存和 span 状态 |
+| LLM chat | `start_chat_span` / `set_usage` / `set_response` / `set_http_error` | 按 OTel GenAI semantic conventions 设置属性 |
+| Tool 执行 | `start_tool_span` / `set_tool_result` / `set_tool_error` | 记录工具名、参数、结果、错误 |
+| Agent turn | `start_agent_turn_span` / `set_turn` / `set_turn_exhausted` | 记录输入/输出、轮数、工具调用次数 |
 
 > **注意**：`agent-telemetry` 默认目标后端为 `native`，因为 `opentelemetry/otlp` 依赖的 `async/http`、`async/socket` 接口只在 native 后端可用。
 
