@@ -10,3 +10,6 @@ _build/
 
 # IDE / editor
 .reasonix/
+
+# AI-generated design docs (not part of project deliverables)
+docs/superpowers/
