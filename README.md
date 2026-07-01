@@ -132,46 +132,7 @@ moon run cmd/main -- --ask "北京今天天气怎么样？"
 moon test
 ```
 
-## Agent Observability
-
-当前项目已实现 **Agent 全链路**的 OpenTelemetry 插桩，Trace 结构如下：
-
-```
-agent.turn                    # Agent 编排层：一次完整的用户交互
-├── gen_ai.chat             # 第 1 轮 LLM 调用（返回 tool_calls）
-├── gen_ai.tool.execution   # 工具执行（如 get_weather）
-└── gen_ai.chat             # 第 2 轮 LLM 调用（返回最终回复）
-```
-
-### Span 详情
-
-**`agent.turn`**（Agent 编排层）
-- `agent.turn.input` = 用户输入
-- `agent.turn.max_tool_turns` = 最大允许轮数
-- `agent.turn.actual_turns` = 实际执行轮数
-- `agent.turn.tool_call_count` = 本 turn 执行的工具调用次数
-- `agent.turn.output` = 最终回复
-- 达到轮数上限时 `Status=Error`
-
-**`gen_ai.chat`**（LLM Proxy 层）
-- `gen_ai.operation.name` = `chat`
-- `gen_ai.provider.name` = 配置的提供商名称
-- `gen_ai.request.model` / `gen_ai.request.max_tokens`
-- `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens`
-- `gen_ai.response.id` / `gen_ai.response.model` / `gen_ai.response.finish_reasons`
-- `gen_ai.input.messages` / `gen_ai.output.messages`（当 `CAPTURE_CONTENT=true`）
-
-**`gen_ai.tool.execution`**（工具执行层）
-- `gen_ai.tool.name` = 工具名称
-- `gen_ai.tool.call.arguments` = 调用参数
-- `gen_ai.tool.call.result` = 执行结果
-- 未知工具或执行出错时 `Status=Error`
-
-通过设置 `OTEL_STDOUT=true` 可在 stdout 查看 trace 输出；设置 `CAPTURE_CONTENT=true` 可开启消息内容采集（默认关闭，避免敏感信息泄露）。
-
-默认情况下，应用通过 **OTLP/HTTP** 将 trace 导出到 `http://localhost:4318`，可直接对接本地 OpenTelemetry Collector。
-
-### 本地可观测性栈
+## 本地可观测性栈
 
 项目提供了最小化的本地 Collector + Jaeger 组合：
 
@@ -191,141 +152,44 @@ docker compose up -d
 OTEL_STDOUT=false moon run cmd/main
 ```
 
-发送一条消息后，打开 http://localhost:16686 即可在 Jaeger 中查看 `gen_ai.chat` span 及完整属性。Service 名称为 `agent-observability`（可通过 `OTEL_SERVICE_NAME` 环境变量覆盖）。
+发送一条消息后，打开 http://localhost:16686 即可在 Jaeger 中查看 trace。Service 名称为 `agent-observability`（可通过 `OTEL_SERVICE_NAME` 环境变量覆盖）。
 
-Batch Span Processor 针对交互式 REPL 做了调优：
-- `max_queue_size=64`
-- `max_export_batch_size=16`
-- `scheduled_delay_millis=1000`
-- `export_timeout_millis=5000`
+Batch Span Processor 针对交互式 REPL 做了调优，你也可以通过标准环境变量覆盖：
 
-这样 span 会在 1 秒内或累积 16 条时被批量发送，退出前还会显式 `force_flush()` + `shutdown()`，避免数据丢失。你也可以通过标准环境变量覆盖：
-- `OTEL_BSP_MAX_QUEUE_SIZE`
-- `OTEL_BSP_MAX_EXPORT_BATCH_SIZE`
-- `OTEL_BSP_SCHEDULE_DELAY`
-- `OTEL_BSP_EXPORT_TIMEOUT`
-
-Agent 编排层（`Agent::run`）与工具执行层的 trace 插桩已完整实现：
-- ✅ **Agent turn 级别 span**（`agent.turn`）：记录输入/输出、实际工具调用轮数、最大允许轮数
-- ✅ **Tool 执行 span**（`gen_ai.tool.execution`）：记录工具名称、调用参数、执行结果、错误状态
+| 变量 | 默认值 |
+|---|---|
+| `OTEL_BSP_MAX_QUEUE_SIZE` | `64` |
+| `OTEL_BSP_MAX_EXPORT_BATCH_SIZE` | `16` |
+| `OTEL_BSP_SCHEDULE_DELAY` | `1000` |
+| `OTEL_BSP_EXPORT_TIMEOUT` | `5000` |
 
 ## `agent-telemetry` 库
 
 仓库中的 `agent-telemetry/` 是一个独立的 MoonBit 包，封装了 Agent/LLM/Tool 场景的 OpenTelemetry 插桩。原 `agent-observability` 应用已改用此库实现。
 
-### 安装
+安装方式：`moon add cybershang/agent-telemetry`
 
-```bash
-moon add cybershang/agent-telemetry
-```
-
-### 使用示例
-
-#### 一键从环境变量初始化
-
-```moonbit
-let provider = @telemetry.init_from_env(
-  service_name="my-agent",
-  id_generator=@telemetry.ProcessUniqueRandom,
-)
-```
-
-配合环境变量：
-
-```bash
-OTEL_STDOUT=true moon run cmd/main
-```
-
-#### 显式选择 exporter
-
-```moonbit
-let config = @telemetry.TelemetryConfig::new(service_name="my-agent")
-let provider = @telemetry.init_telemetry(
-  config,
-  @telemetry.Stdout,
-  id_generator=@telemetry.ProcessUniqueRandom,
-)
-```
-
-#### 使用 OTLP exporter
-
-```moonbit
-let provider = @telemetry.init_telemetry(
-  config,
-  @telemetry.Otlp("http://localhost:4318"),
-  id_generator=@telemetry.ProcessUniqueRandom,
-)
-```
-
-#### 使用自定义 exporter / ID generator
-
-```moonbit
-let provider = @telemetry.init_telemetry(
-  config,
-  @telemetry.Custom(my_exporter),
-  id_generator=@telemetry.Custom(my_id_generator),
-)
-```
-
-#### 创建 GenAI chat span
-
-```moonbit
-let tracer = @telemetry.tracer("my-agent/llm")
-let span = @telemetry.start_chat_span(
-  tracer,
-  provider_name="stepfun",
-  model="step-3.7-flash",
-  max_tokens=1024,
-)
-// ... 发起 HTTP 请求、拿到响应 ...
-@telemetry.set_response(span, response_json)
-@telemetry.end_span(span)
-```
-
-### 提供的语义 helper
-
-| 场景 | 主要函数 | 说明 |
-|---|---|---|
-| Provider 初始化 | `init_from_env` / `init_telemetry` | 环境变量一键启动；显式选择 exporter 与 `IdGeneratorOption` |
-| 通用 span 生命周期 | `start_span` / `end_span` | 薄封装，管理 tracer 缓存和 span 状态 |
-| LLM chat | `start_chat_span` / `set_usage` / `set_response` / `set_http_error` | 按 OTel GenAI semantic conventions 设置属性 |
-| Tool 执行 | `start_tool_span` / `set_tool_result` / `set_tool_error` | 记录工具名、参数、结果、错误 |
-| Agent turn | `start_agent_turn_span` / `set_turn` / `set_turn_exhausted` | 记录输入/输出、轮数、工具调用次数 |
-
-> **注意**：`agent-telemetry` 默认目标后端为 `native`，因为 `opentelemetry/otlp` 依赖的 `async/http`、`async/socket` 接口只在 native 后端可用。
+详细 API 文档与使用示例请参见 [`agent-telemetry/README.md`](agent-telemetry/README.md)。
 
 ## 项目结构
 
 ```
 agent-observability/
-├── moon.mod                    # MoonBit 工作区/模块清单
-├── moon.pkg                    # 根包（演示应用）导入声明
-├── moon.work                   # 工作区成员声明
-├── llm.mbt                     # Client：类型定义 + HTTP 封装（使用 agent-telemetry）
-├── llm_test.mbt                # Client 白盒测试
-├── agent.mbt                   # Agent：对话编排 + tool 执行（使用 agent-telemetry）
-├── agent_test.mbt              # Agent 端到端冒烟测试（真实 LLM API）
-├── tools.mbt                   # ToolRegistry：工具定义（使用 agent-telemetry）
-├── cmd/main/main.mbt           # 入口：一行 `@telemetry.init_from_env` 完成遥测初始化
-├── settings.mbt                # Settings：集中配置管理 + .env 读取辅助
-├── agent-telemetry/            # 可复用插桩库（独立 MoonBit 包）
-│   ├── moon.mod
-│   ├── moon.pkg
-│   ├── lib.mbt                 # provider 初始化、tracer 缓存、span 生命周期
-│   ├── genai.mbt               # GenAI chat 语义 helper
-│   ├── tool.mbt                # Tool execution 语义 helper
-│   ├── agent.mbt               # Agent turn 语义 helper
-│   └── *_test.mbt              # 库单元测试
-├── .env.example                # 配置模板
-├── deploy/
-│   └── minimum/                # 本地最小化 OTel Collector + Jaeger
-│       ├── docker-compose.yml
-│       └── otel-collector-config.yml
-├── cmd/
-│   └── main/
-│       ├── moon.pkg            # 可执行包配置
-│       └── main.mbt            # REPL 入口
-└── AGENTS.md                   # 开发指南与约定
+├── agent-telemetry/         # 独立 MoonBit 插桩库（已发布到 mooncakes.io）
+│                            # 封装 OTel 初始化、tracer、GenAI/Tool/Agent 语义 helper
+├── cmd/main/                # REPL 可执行入口
+├── deploy/                  # 一键部署配置
+│   ├── minimum/             #   本地 Collector + Jaeger（docker-compose）
+│   └── greptime/            #   生产级 GreptimeDB + Grafana 栈
+├── docs/                    # 文档
+│   ├── instrumentation.md   #   插桩位置与 Span 命名详解
+│   └── findings.md          #   开发过程中的技术发现记录
+├── scripts/                 # 辅助脚本
+├── proposal.md              # 比赛申报书
+├── report.md                # 结项报告
+├── AGENTS.md                # 开发指南与约定
+├── .env.example             # 环境变量配置模板
+└── moon.work                # 工作区定义（根包 + agent-telemetry）
 ```
 
 ## 技术栈
