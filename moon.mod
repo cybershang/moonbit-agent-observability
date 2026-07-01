@@ -6,6 +6,8 @@ readme = "README.md"
 
 license = "MulanPSL-2.0"
 
+repository = "https://github.com/cybershang/moonbit-agent-observability"
+
 import {
   "cybershang/agent-telemetry@0.1.4",
   "moonbitlang/async@0.19.2",
