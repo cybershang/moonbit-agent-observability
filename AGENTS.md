@@ -108,7 +108,7 @@ moon run cmd/main
 
 - **禁止在类型名和函数名中使用模糊后缀/前缀**，例如 `Handle`、`Helper`、`Manager`、`Util`、`Info`、`Data`、`Processor` 等。这些词汇掩盖了真实的职责，使代码意图不清。
 - 类型名应直接表达其聚合的内容或承担的角色，例如 `TelemetryProviders`（一组 provider）、`SpanExporter`（导出 span 的东西）、`BatchConfig`（批处理配置）。
-- 函数名应使用动词或动词短语，直接描述行为，例如 `record_llm_call`、`emit_log`、`spawn_background_tasks`、`build_resource`。
+- 函数名应使用动词或动词短语，直接描述行为，例如 `record_llm_latency`、`emit_log`、`spawn_background_tasks`、`build_resource`。
 - 讨论设计方案时，使用**具体的类型名或函数名**，避免用“helper”“handle”“wrapper”这类概括性词汇指代代码实体。
 
 ## 测试理念

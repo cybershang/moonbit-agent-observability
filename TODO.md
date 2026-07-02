@@ -41,6 +41,6 @@ git push github v0.1.4
 
 ## 🟢 建议优化
 
-- [ ] 检查和更新所有文档中的过时内容（如 API 命名变更后 README 是否同步）
-- [ ] 确认 `proposal.md` 和 `report.md` 的内容与最终代码一致
+- [x] 检查和更新所有文档中的过时内容（如 API 命名变更后 README 是否同步）
+- [x] 确认 `proposal.md` 和 `report.md` 的内容与最终代码一致
 - [ ] 提交前运行一次完整的 `moon test`，确认 76/77 通过（1 个 LLM API Key 相关失败为预期）
