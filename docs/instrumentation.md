@@ -110,8 +110,9 @@ let parent_context = span.context()
 
 ```moonbit
 span.set_status(@trace.Status::error(description=Some("HTTP {code}")))
-span.add_event("llm.http_error", attributes=[
-  @otel.KeyValue::new("http.status_code", Int64(response.code.to_int64())),
+span.add_event("gen_ai.client.operation.exception", attributes=[
+  @otel.KeyValue::new("exception.type", String(response.code.to_string())),
+  @otel.KeyValue::new("exception.message", String("HTTP \{response.code}")),
 ])
 span.end()
 ```
@@ -122,7 +123,7 @@ span.end()
 
 ## 4. 工具执行（`execute_tool`）
 
-**Span 名称**：`gen_ai.tool.execution`
+**Span 名称**：`execute_tool {name}`（如 `execute_tool get_weather`）
 
 **文件位置**：`agent.mbt:153`
 
@@ -170,8 +171,8 @@ pub async fn execute_tool(
 ```
 agent.turn
 ├── gen_ai.chat
-│   └── gen_ai.tool.execution
-│   └── gen_ai.tool.execution
+│   └── execute_tool get_weather
+│   └── execute_tool lookup_city
 └── gen_ai.chat
 ```
 
