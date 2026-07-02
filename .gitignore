@@ -13,3 +13,6 @@ _build/
 
 # AI-generated design docs (not part of project deliverables)
 docs/superpowers/
+
+# Vendored OTel GenAI semantic conventions (local reference copy)
+semantic-conventions-genai/
