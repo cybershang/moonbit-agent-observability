@@ -43,12 +43,14 @@ jobs:
       - name: Format check
         run: |
           moon fmt
-          git diff --exit-code
+          # Ignore submodule formatting (agent-telemetry has its own CI)
+          git diff --exit-code --ignore-submodules
 
       - name: Info check
         run: |
           moon info
-          git diff --exit-code
+          # Ignore submodule dirtiness (agent-telemetry has its own CI)
+          git diff --exit-code --ignore-submodules
 
       - name: Test agent-telemetry library
         run: moon test -p cybershang/agent-telemetry --target native
