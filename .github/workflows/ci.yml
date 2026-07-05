@@ -28,8 +28,17 @@ jobs:
           moon update
           moon install
 
-      - name: Check
+      - name: Check (with workspace member)
         run: moon check
+
+      - name: Check published mooncake dependency
+        run: |
+          # Temporarily remove workspace member to validate the published
+          # mooncake package (cybershang/agent-telemetry@0.1.6) is usable
+          cp moon.work moon.work.bak
+          echo 'members = ["."]' > moon.work
+          moon check
+          mv moon.work.bak moon.work
 
       - name: Format check
         run: |
