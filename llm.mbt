@@ -114,7 +114,10 @@ pub fn Client::from_settings(settings : Settings) -> Client {
 /// - `gen_ai.response.finish_reasons` (from response)
 /// - `gen_ai.input.messages` and `gen_ai.output.messages` when `capture_content` is enabled
 /// - `gen_ai.client.token.usage` metric for input/output tokens
-/// - Conversation logs when `capture_content` is enabled
+/// - Conversation logs: the most recent input message is logged before the HTTP call,
+///   and the LLM output messages are logged after the response. Only the last message
+///   in the input array is logged per call to prevent re-tagging history from previous
+///   turns with the current trace_id.
 pub async fn Client::chat(
   self : Client,
   messages : Array[Message],
@@ -153,17 +156,24 @@ pub async fn Client::chat(
     "Authorization": "Bearer " + self.api_key,
   }
 
-  // Log input conversation messages when content capture is enabled.
+  // Log the most recent input message (just added by the agent) when content capture is enabled.
+  // Only the last message is logged here to prevent messages from previous turns being
+  // re-tagged with the current trace_id. Assistant output messages are logged separately
+  // after the LLM response (see output logging below).
   if self.capture_content {
-    for index, msg in messages {
-      let content = msg.content.unwrap_or("")
-      @telemetry.log_conversation_message(
-        "cybershang/agent-observability/llm",
-        msg.role,
-        content,
-        index~,
-        trace_context=Some(span.span_context()),
-      )
+    let last_idx = messages.length() - 1
+    match messages.get(last_idx) {
+      Some(msg) => {
+        let content = msg.content.unwrap_or("")
+        @telemetry.log_conversation_message(
+          "cybershang/agent-observability/llm",
+          msg.role,
+          content,
+          index=last_idx,
+          trace_context=Some(span.span_context()),
+        )
+      }
+      None => ()
     }
   }
 
