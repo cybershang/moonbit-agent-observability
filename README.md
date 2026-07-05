@@ -1,8 +1,8 @@
-# agent-observability
+# Agent Observability Demo
 
 [![Check & Test](https://github.com/cybershang/moonbit-agent-observability/actions/workflows/ci.yml/badge.svg)](https://github.com/cybershang/moonbit-agent-observability/actions/workflows/ci.yml)
 
-基于 MoonBit 实现的精简 AI Agent，演示 Agent 核心运行链路的 OpenTelemetry 可观测性插桩。
+基于 MoonBit 实现的精简 AI Agent Demo，演示 Agent 核心运行链路的 OpenTelemetry 可观测性插桩。
 
 本项目同时包含可复用的 `agent-telemetry` 库：把原本散落在业务代码中的 OTel 初始化、tracer 管理、span 生命周期以及 GenAI/Tool/Agent 语义约定封装成独立 MoonBit 包，方便其他 Agent 项目直接引用。
 
@@ -19,6 +19,14 @@ Agent基础交互，包含多轮对话和工具调用:
 使用CAPTURE_CONTENT开启对用户输入和LLM响应的采集：
 <img src="https://img.yingjie.dev/file/yingjie-blog/WindowsTerminal_6gHMJ2j9Fm_1781130539691_rc140m.avif"/>
 
+
+## Grafana 仪表盘
+
+使用 GreptimeDB + Grafana 部署的完整可观测性面板，覆盖 Traces、Metrics、Logs 三大支柱：
+
+![Grafana Dashboard](assets/grafana-dashboard-demo.png)
+
+部署方式见 [`deploy/greptime/README.md`](deploy/greptime/README.md)。
 
 ## Agent架构
 
