@@ -2,22 +2,29 @@
 
 [![Check & Test](https://github.com/cybershang/moonbit-agent-observability/actions/workflows/ci.yml/badge.svg)](https://github.com/cybershang/moonbit-agent-observability/actions/workflows/ci.yml)
 
-基于 MoonBit 实现的精简 AI Agent Demo，演示 Agent 核心运行链路的 OpenTelemetry 可观测性插桩。
+参加 MoonBit 2026开源大赛，目标是智能体可观测。
+本人项目内容包含：
+- [智能体插桩库](https://github.com/cybershang/agent-telemetry)
+- [已插桩的智能体项目示例](https://github.com/cybershang/moonbit-agent-observability)
 
-本项目同时包含可复用的 `agent-telemetry` 库：把原本散落在业务代码中的 OTel 初始化、tracer 管理、span 生命周期以及 GenAI/Tool/Agent 语义约定封装成独立 MoonBit 包，方便其他 Agent 项目直接引用。
+智能体插桩库已发布到 MoonBit 官方包仓库 [mooncakes.io](https://mooncakes.io/docs/cybershang/agent-telemetry)，在本仓库中作为submodule。
+
 
 ## 演示Demo
 ### 实现了基础的交互和LLM插桩
 视频：https://www.bilibili.com/video/BV1n4EZ61EmU
 
 Agent基础交互，包含多轮对话和工具调用:
-<img src="https://img.yingjie.dev/file/yingjie-blog/WindowsTerminal_BsUDSmrWHe_1781130355777_38jqds.avif"/>
+<!-- <img src="https://img.yingjie.dev/file/yingjie-blog/WindowsTerminal_BsUDSmrWHe_1781130355777_38jqds.avif"/> -->
+![Agent interactive](./assets/agent-interactive.avif)
 
 使用OTEL_STDOUT开启遥测信号回显：
-<img src="https://img.yingjie.dev/file/yingjie-blog/WindowsTerminal_nJ6LiuPjdN_1781130454369_0k4jcv.avif"/>
+<!-- <img src="https://img.yingjie.dev/file/yingjie-blog/WindowsTerminal_nJ6LiuPjdN_1781130454369_0k4jcv.avif"/> -->
+![agent otel echo](./assets/agent-otel-echo.avif)
 
 使用CAPTURE_CONTENT开启对用户输入和LLM响应的采集：
-<img src="https://img.yingjie.dev/file/yingjie-blog/WindowsTerminal_6gHMJ2j9Fm_1781130539691_rc140m.avif"/>
+<!-- <img src="https://img.yingjie.dev/file/yingjie-blog/WindowsTerminal_6gHMJ2j9Fm_1781130539691_rc140m.avif"/> -->
+![agent content capture](./assets/agent-content-capture.avif)
 
 
 ## Grafana 仪表盘
