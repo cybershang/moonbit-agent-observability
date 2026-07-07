@@ -1,4 +1,23 @@
 services:
+  # OTel Collector: receives OTLP from the Agent app, forwards to GreptimeDB.
+  # Best practice: Agent → OTel Collector → GreptimeDB.
+  # The Collector provides buffering, batching, retries, and decouples
+  # the app from the storage backend.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ["--config=/etc/otel-collector-config.yml"]
+    volumes:
+      - ./otel-collector-config.yml:/etc/otel-collector-config.yml
+    ports:
+      - "4318:4318"
+      - "4317:4317"
+    depends_on:
+      greptimedb:
+        condition: service_healthy
+    networks:
+      - greptime-network
+    restart: unless-stopped
+
   greptimedb:
     image: greptime/greptimedb:latest
     command: standalone start --http-addr=0.0.0.0:4000 --rpc-addr=0.0.0.0:4001 --mysql-addr=0.0.0.0:4002
@@ -59,9 +78,7 @@ services:
         condition: service_healthy
     networks:
       - greptime-network
-    restart: "no"
-    profiles:
-      - load
+    restart: on-failure
 
 networks:
   greptime-network:

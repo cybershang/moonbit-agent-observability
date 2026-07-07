@@ -20,10 +20,25 @@ This stack uses the latest OpenTelemetry GenAI semantic conventions:
   - `gen_ai_request_model`
   - `gen_ai_token_type`
 
+## Architecture
+
+```
+Agent App  ──OTLP──▶  OTel Collector  ──OTLP──▶  GreptimeDB  ◀── Grafana
+ (localhost:4318)      (buffering, batching)      (storage)      (dashboard)
+```
+
+The Agent app emits OTLP telemetry (traces + logs) which is received by the
+OTel Collector. The Collector batches, retries, and forwards the data to
+GreptimeDB's OTLP HTTP endpoint. Grafana queries GreptimeDB for visualization.
+
+This follows the [GreptimeDB recommended pattern](https://docs.greptime.cn/user-guide/ingest-data/for-observability/otel-collector):
+using an OTel Collector as the ingestion gateway provides buffering,
+backpressure handling, and decouples the app from the storage backend.
+
 ## Quick Start
 
 ```bash
-# Start GreptimeDB + Grafana
+# Start OTel Collector + GreptimeDB + Grafana
 docker compose up -d
 
 # (Optional) Start the load generator and create Flow aggregations
@@ -35,6 +50,8 @@ docker compose --profile load up -d
 | Service              | URL                                   |
 |----------------------|---------------------------------------|
 | Grafana              | http://localhost:3000 (admin / admin) |
+| OTel Collector HTTP  | http://localhost:4318                 |
+| OTel Collector gRPC  | localhost:4317                        |
 | GreptimeDB HTTP API  | http://localhost:4000                 |
 | GreptimeDB gRPC      | localhost:4001                        |
 | GreptimeDB MySQL     | mysql -h 127.0.0.1 -P 4002            |

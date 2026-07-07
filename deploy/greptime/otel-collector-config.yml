@@ -1,0 +1,81 @@
+# OTel Collector configuration
+# Receives OTLP from the Agent app and forwards to GreptimeDB.
+#
+# Best practice: Agent → OTel Collector → GreptimeDB
+# - OTel Collector handles buffering, batching, retries, and backpressure.
+# - GreptimeDB receives pre-batched telemetry via its OTLP HTTP endpoint.
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  batch:
+    # Flush batch when any of these thresholds are met
+    # Use short timeout and low batch size for development — the app
+    # produces only a few spans/metrics per turn.
+    timeout: 1s
+    send_batch_size: 16
+    send_batch_max_size: 64
+
+exporters:
+  # Separate exporters per signal — the otlphttp exporter automatically appends
+  # /v1/traces, /v1/metrics, /v1/logs to the base endpoint.
+  # GreptimeDB OTLP endpoint: http://<host>:4000/v1/otlp/v1/<signal>
+  otlphttp/traces:
+    endpoint: http://greptimedb:4000/v1/otlp
+    tls:
+      insecure: true
+    headers:
+      x-greptime-pipeline-name: 'greptime_trace_v1'
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 300s
+    sending_queue:
+      enabled: true
+      queue_size: 1000
+  otlphttp/metrics:
+    endpoint: http://greptimedb:4000/v1/otlp
+    tls:
+      insecure: true
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 300s
+    sending_queue:
+      enabled: true
+      queue_size: 1000
+  otlphttp/logs:
+    endpoint: http://greptimedb:4000/v1/otlp
+    tls:
+      insecure: true
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 300s
+    sending_queue:
+      enabled: true
+      queue_size: 1000
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/traces]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/metrics]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/logs]

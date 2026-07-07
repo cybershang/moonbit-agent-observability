@@ -33,6 +33,20 @@ CREATE TABLE IF NOT EXISTS genai_status_1m (
     PRIMARY KEY (model, span_status)
 );
 
+-- Conversation log table for the "Recent Conversations" Grafana panel.
+-- When the agent-telemetry conversation logger sends data, GreptimeDB's OTLP
+-- log pipeline auto-creates this table with additional columns.  The minimal
+-- schema here is enough for the dashboard query (timestamp, trace_id, body).
+CREATE TABLE IF NOT EXISTS genai_conversations (
+    timestamp TIMESTAMP TIME INDEX,
+    trace_id STRING,
+    span_id STRING,
+    severity_text STRING,
+    severity_number INT64,
+    body STRING,
+    resource__service__name STRING
+);
+
 -- =============================================================================
 -- Flows (continuous aggregation)
 -- =============================================================================
