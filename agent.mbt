@@ -12,6 +12,7 @@ pub struct Agent {
   messages : Array[Message]
   tools : Array[Tool]
   max_tool_turns : Int
+  capture_content : Bool
 }
 
 ///|
@@ -20,8 +21,9 @@ pub fn Agent::new(
   client : Client,
   tools? : Array[Tool] = [],
   max_tool_turns? : Int = 10,
+  capture_content? : Bool = true,
 ) -> Agent {
-  { client, messages: [], tools, max_tool_turns }
+  { client, messages: [], tools, max_tool_turns, capture_content }
 }
 
 ///|
@@ -49,9 +51,10 @@ pub struct AgentTurnResult {
 pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
   let tracer = @telemetry.tracer("cybershang/agent-o11y-demo/agent")
   let meter = @telemetry.meter("cybershang/agent-o11y-demo/agent")
+  let span_input = if self.capture_content { prompt } else { "" }
   let span = @telemetry.start_agent_turn_span(
     tracer,
-    prompt,
+    span_input,
     self.max_tool_turns,
   )
   // No async context storage by design — explicit is better than implicit.
@@ -117,7 +120,8 @@ pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
   )
   @telemetry.set_bool(span, "app.agent.reached_max_turns", has_tool_calls)
 
-  @telemetry.set_turn(span, turn, executed.length(), final_reply)
+  let span_output = if self.capture_content { final_reply } else { "" }
+  @telemetry.set_turn(span, turn, executed.length(), span_output)
   @telemetry.record_turn(meter, max_tool_turns_reached=has_tool_calls)
   @telemetry.end_span(span)
 

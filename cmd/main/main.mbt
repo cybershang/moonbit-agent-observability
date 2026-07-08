@@ -20,6 +20,7 @@ async fn main {
     client,
     tools=@agent.tools,
     max_tool_turns=settings.max_tool_turns,
+    capture_content=settings.capture_content,
   )
 
   // Emit a registration log for every known tool. The dashboard uses these
