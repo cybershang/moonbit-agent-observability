@@ -41,7 +41,7 @@ let registered_tools : Array[RegisteredTool] = [
   {
     tool: Tool::new(
       name="execute_command",
-      description="Execute a command in the system shell and return stdout. Only safe read-only commands (e.g. ls, cat, echo, pwd) are allowed; commands that modify the system (e.g. rm, mv, cp, write) are forbidden.",
+      description="Execute a command in the system shell and return stdout. Only read-only commands (e.g. ls, cat, echo, pwd, head, tail, date, uname) are allowed; destructive commands (rm, mv, cp, chmod), network tools (curl, wget, ssh), shell operators (|, >, ;, &&), and privilege escalation (sudo, su) are forbidden.",
       parameters={
         "type": "object",
         "properties": {
@@ -300,6 +300,141 @@ fn url_encode(s : String) -> String {
 }
 
 ///|
+/// Return the last segment of a slash-delimited path (e.g. `/bin/echo` → `echo`).
+fn last_path_segment(path : String) -> String {
+  let mut last : String = path
+  for part in path.split("/") {
+    if !part.is_empty() {
+      last = part.to_owned()
+    }
+  }
+  last
+}
+
+///|
+/// Return the first space-delimited word of a string.
+fn first_word(s : String) -> String {
+  for part in s.split(" ") {
+    if !part.is_empty() {
+      return part.to_owned()
+    }
+  }
+  s
+}
+
+///|
+/// Extract the base command name from a shell command string.
+///
+/// Strips leading path components (e.g. `/bin/echo` → `echo`) and
+/// leading `sudo` / `doas` prefixes, then returns the first word.
+fn extract_base_command(command : String) -> String {
+  let trimmed = command.trim()
+  let mut rest = trimmed.to_owned()
+  // Step 1: strip leading privilege-elevation prefixes
+  for prefix in ["sudo ", "doas ", "pkexec "] {
+    if rest.has_prefix(prefix) {
+      rest = rest[prefix.length():].to_owned()
+    }
+  }
+  // Step 2: get the first space-delimited word
+  let first = first_word(rest)
+  // Step 3: strip path components from the first word only
+  // (`/bin/echo` → `echo`, `./foo` → `foo`)
+  if first.contains("/") {
+    last_path_segment(first)
+  } else {
+    first
+  }
+}
+
+///|
+/// Check whether a base command is on the forbidden list.
+fn is_command_forbidden(base_cmd : String) -> Bool {
+  // These commands can modify the filesystem, the system state, or
+  // escalate privileges — the agent must never be allowed to run them.
+  let forbidden_commands : Array[String] = [
+    // Filesystem destruction / mutation
+    "rm", "mv", "cp", "dd", "mkfs", "fdisk", "format", "del", "rd", "rmdir", "chmod",
+    "chown", "chattr", "touch", "ln", "link", "unlink", "truncate", "fallocate",
+    "mknod",
+    // Privilege escalation
+     "sudo", "doas", "pkexec", "su", "login", "passwd", "chsh", "chfn", "gpasswd",
+    "newgrp",
+    // User / group management
+     "useradd", "usermod", "userdel", "groupadd", "groupmod", "groupdel",
+    // Package management
+     "apt", "apt-get", "dpkg", "yum", "dnf", "rpm", "pacman", "zypper", "snap", "flatpak",
+    "brew", "port",
+    // Network / download
+     "wget", "curl", "nc", "netcat", "telnet", "ssh", "scp", "sftp", "rsync", "ftp",
+    "tftp", "ncat", "socat",
+    // Process management / system control
+     "kill", "pkill", "killall", "nohup", "renice", "nice", "reboot", "shutdown",
+    "poweroff", "halt", "init", "systemctl", "service", "journalctl", "logrotate",
+    // Mount / filesystem
+     "mount", "umount", "swapon", "swapoff", "losetup",
+    // Compilers / interpreters (code execution risk)
+     "gcc", "g++", "clang", "rustc", "go", "javac", "python", "python3", "perl",
+    "ruby", "php", "node", "deno", "lua", "tcc", "nasm",
+    // Shell interpreters (spawning an interactive shell)
+     "bash", "sh", "zsh", "fish", "dash", "ksh", "tcsh",
+    // Code execution / evaluation
+     "eval", "source", "exec", "alias", "export",
+    // Pipe / process substitution tools
+     "tee", "xargs",
+    // Build systems / make (can run arbitrary commands)
+     "make", "cmake", "ninja", "mvn", "gradle",
+    // Package installers (can execute arbitrary code)
+     "pip", "pip3", "npm", "npx", "yarn", "pnpm", "cargo", "gem", "cabal", "stack",
+    "opam",
+    // Timer / scheduling
+     "at", "batch", "crontab",
+    // Encryption / key management
+     "gpg", "openssl", "keytool",
+    // dd is already listed; iptables / firewall
+     "iptables", "ip6tables", "ufw", "firewall-cmd",
+    // Network configuration
+     "ip", "ifconfig", "route", "iwconfig", "nmcli", "nmtui",
+    // SELinux / AppArmor
+     "setenforce", "setsebool", "aa-enforce", "aa-complain",
+  ]
+  for name in forbidden_commands {
+    if base_cmd == name {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// Check whether a command string contains dangerous shell operators.
+///
+/// Returns the first dangerous operator found, or `None` if the command
+/// is clean.
+fn find_dangerous_operator(command : String) -> String? {
+  // These operators can chain commands or modify execution flow.
+  // Check order matters: `&&` and `||` must come before `&` and `|`.
+  let operators : Array[String] = [
+    // Command substitution (executes embedded commands)
+    "$(", "`",
+    // Command chaining
+     "&&", "||", ";",
+    // Pipes
+     "|",
+    // Redirections
+     ">", ">>", "<", "&>", "2>",
+    // Background execution
+     "&",
+  ]
+  for op in operators {
+    if command.contains(op) {
+      return Some(op)
+    }
+  }
+  None
+}
+
+///|
 /// Execute a shell command and return stdout as string.
 async fn execute_command_tool(args_json : String) -> String {
   let args = @json.parse(args_json) catch {
@@ -310,16 +445,22 @@ async fn execute_command_tool(args_json : String) -> String {
   } else {
     return "{\"error\": \"Missing 'command' field\"}"
   }
-  // Security: reject dangerous commands
-  let forbidden = [
-    "rm", "mv", "cp", "dd", "mkfs", "fdisk", "format", "del", "rd", "rmdir",
-  ]
-  let cmd_lower = command.trim().to_lower()
-  for bad in forbidden {
-    if cmd_lower.has_prefix(bad + " ") || cmd_lower == bad {
-      return "{\"error\": \"Forbidden command: " + bad + "\"}"
-    }
+
+  // Security check 1: reject dangerous shell operators.
+  match find_dangerous_operator(command) {
+    Some(op) =>
+      return "{\"error\": \"Forbidden shell operator: " +
+        escape_json(op) +
+        "\"}"
+    None => ()
   }
+
+  // Security check 2: extract the base command and check the blocklist.
+  let base_cmd = extract_base_command(command)
+  if is_command_forbidden(base_cmd) {
+    return "{\"error\": \"Forbidden command: " + escape_json(base_cmd) + "\"}"
+  }
+
   // Run command and collect output. Use lossy UTF-8 decoding so commands that
   // emit binary data (e.g. `cat` on a non-text file) do not crash the agent.
   let (code, stdout, _stderr) = @process.collect_output("sh", ["-c", command])

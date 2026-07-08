@@ -25,8 +25,9 @@ pub struct Agent {
   messages : Array[Message]
   tools : Array[Tool]
   max_tool_turns : Int
+  capture_content : Bool
 }
-pub fn Agent::new(Client, tools? : Array[Tool], max_tool_turns? : Int) -> Self
+pub fn Agent::new(Client, tools? : Array[Tool], max_tool_turns? : Int, capture_content? : Bool) -> Self
 pub async fn Agent::run(Self, String) -> AgentTurnResult
 
 pub struct AgentTurnResult {
