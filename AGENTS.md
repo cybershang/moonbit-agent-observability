@@ -54,7 +54,7 @@ agent-observability/
 
 本项目采用**双库同仓开发**：
 
-- **Agent 应用**在 `agent-observability/` 根目录下开发，模块名为 `cybershang/agent-observability`。
+- **Agent 应用**在 `agent-observability/` 根目录下开发，模块名为 `cybershang/agent-o11y-demo`。
 - **插桩库**在 `agent-observability/agent-telemetry/` 子目录下开发，模块名为 `cybershang/agent-telemetry`。
 
 `agent-observability` 通过 `moon.mod` 依赖 `cybershang/agent-telemetry`。本地开发时，子目录 `agent-telemetry/` 作为工作区成员被优先使用；发布时，子目录中的模块单独发布到 mooncakes.io，版本号由它自己的 `agent-telemetry/moon.mod` 决定。

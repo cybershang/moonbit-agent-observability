@@ -47,8 +47,8 @@ pub struct AgentTurnResult {
 /// is received. Returns the assistant's reply and a record of any tool
 /// calls executed during the turn.
 pub async fn Agent::run(self : Agent, prompt : String) -> AgentTurnResult {
-  let tracer = @telemetry.tracer("cybershang/agent-observability/agent")
-  let meter = @telemetry.meter("cybershang/agent-observability/agent")
+  let tracer = @telemetry.tracer("cybershang/agent-o11y-demo/agent")
+  let meter = @telemetry.meter("cybershang/agent-o11y-demo/agent")
   let span = @telemetry.start_agent_turn_span(
     tracer,
     prompt,

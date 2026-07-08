@@ -121,8 +121,8 @@ pub async fn Client::chat(
   tools? : Array[Tool] = [],
   parent_context? : @context.Context = @context.Context::empty(),
 ) -> LLMResponse {
-  let tracer = @telemetry.tracer("cybershang/agent-observability/llm")
-  let meter = @telemetry.meter("cybershang/agent-observability/llm")
+  let tracer = @telemetry.tracer("cybershang/agent-o11y-demo/llm")
+  let meter = @telemetry.meter("cybershang/agent-o11y-demo/llm")
   let input_messages = if self.capture_content {
     Some(messages_to_json_array(messages))
   } else {
@@ -158,7 +158,7 @@ pub async fn Client::chat(
     for index, msg in messages {
       let content = msg.content.unwrap_or("")
       @telemetry.log_conversation_message(
-        "cybershang/agent-observability/llm",
+        "cybershang/agent-o11y-demo/llm",
         msg.role,
         content,
         index~,
@@ -185,7 +185,7 @@ pub async fn Client::chat(
   guard response.code == 200 else {
     @telemetry.set_http_error(span, response.code)
     @telemetry.log_error(
-      "cybershang/agent-observability/llm",
+      "cybershang/agent-o11y-demo/llm",
       "LLM request failed with status \{response.code}",
       trace_context=Some(span.span_context()),
     )
@@ -272,7 +272,7 @@ pub async fn Client::chat(
           ""
         }
         @telemetry.log_conversation_message(
-          "cybershang/agent-observability/llm",
+          "cybershang/agent-o11y-demo/llm",
           role,
           content,
           index~,

@@ -1,5 +1,5 @@
 import {
-  "cybershang/agent-observability" @agent,
+  "cybershang/agent-o11y-demo" @agent,
   "cybershang/agent-telemetry" @telemetry,
   "moonbit-community/opentelemetry/interface/common",
   "moonbitlang/async",

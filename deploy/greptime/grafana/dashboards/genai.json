@@ -1534,7 +1534,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "rawSql": "WITH registered_tools AS (SELECT DISTINCT json_get_string(log_attributes, '$.\"gen_ai.tool.name\"') AS tool FROM opentelemetry_logs WHERE body = 'Tool registered' AND scope_name = 'cybershang/agent-observability/tools') SELECT r.tool AS Tool, COUNT(t.span_id) AS Calls, ROUND(AVG(t.duration_nano) / 1000000.0, 2) AS `Avg Duration (ms)` FROM registered_tools r LEFT JOIN opentelemetry_traces t ON t.span_name = 'gen_ai.tool.execution' AND t.`span_attributes.gen_ai.tool.name` = r.tool AND $__timeFilter(t.timestamp) GROUP BY r.tool ORDER BY Calls DESC",
+          "rawSql": "WITH registered_tools AS (SELECT DISTINCT json_get_string(log_attributes, '$.\"gen_ai.tool.name\"') AS tool FROM opentelemetry_logs WHERE body = 'Tool registered' AND scope_name = 'cybershang/agent-o11y-demo/tools') SELECT r.tool AS Tool, COUNT(t.span_id) AS Calls, ROUND(AVG(t.duration_nano) / 1000000.0, 2) AS `Avg Duration (ms)` FROM registered_tools r LEFT JOIN opentelemetry_traces t ON t.span_name = 'gen_ai.tool.execution' AND t.`span_attributes.gen_ai.tool.name` = r.tool AND $__timeFilter(t.timestamp) GROUP BY r.tool ORDER BY Calls DESC",
           "format": "table",
           "refId": "A"
         }

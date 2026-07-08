@@ -6,7 +6,7 @@
 
 | 交付物 | 模块名 | 说明 |
 |---|---|---|
-| **Agent 示例应用** | `cybershang/agent-observability` | 基于 MoonBit 的 AI Agent，演示完整的对话、工具调用、OTel 插桩链路 |
+| **Agent 示例应用** | `cybershang/agent-o11y-demo` | 基于 MoonBit 的 AI Agent，演示完整的对话、工具调用、OTel 插桩链路 |
 | **可复用插桩库** | `cybershang/agent-telemetry` | 将 OTel 初始化、tracer 管理、span 生命周期以及 GenAI/Tool/Agent 语义约定封装成独立 MoonBit 包，**已发布到 mooncakes.io** |
 
 两个项目本身就是一个完整的叙事：**先通过实战造一个 Agent，从 0 到 1 积累插桩经验，再将其中的通用能力沉淀为独立库，让社区可以直接复用。**

@@ -1,4 +1,4 @@
-name = "cybershang/agent-observability"
+name = "cybershang/agent-o11y-demo"
 
 version = "0.1.0"
 

@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "cybershang/agent-observability/cmd/main"
+package "cybershang/agent-o11y-demo/cmd/main"
 
 // Values
 
