@@ -10,6 +10,7 @@ _build/
 
 # IDE / editor
 .reasonix/
+.vscode/settings.json
 
 # AI-generated design docs (not part of project deliverables)
 docs/superpowers/
