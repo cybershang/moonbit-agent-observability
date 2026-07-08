@@ -15,16 +15,13 @@
 视频：https://www.bilibili.com/video/BV1n4EZ61EmU
 
 Agent基础交互，包含多轮对话和工具调用:
-<!-- <img src="https://img.yingjie.dev/file/yingjie-blog/WindowsTerminal_BsUDSmrWHe_1781130355777_38jqds.avif"/> -->
-![Agent interactive](./assets/agent-interactive.avif)
+![Agent interactive](./assets/1-agent-interactive.png)
 
 使用OTEL_STDOUT开启遥测信号回显：
-<!-- <img src="https://img.yingjie.dev/file/yingjie-blog/WindowsTerminal_nJ6LiuPjdN_1781130454369_0k4jcv.avif"/> -->
-![agent otel echo](./assets/agent-otel-echo.avif)
+![agent otel echo](./assets/2-agent-otel-echo.png)
 
 使用CAPTURE_CONTENT开启对用户输入和LLM响应的采集：
-<!-- <img src="https://img.yingjie.dev/file/yingjie-blog/WindowsTerminal_6gHMJ2j9Fm_1781130539691_rc140m.avif"/> -->
-![agent content capture](./assets/agent-content-capture.avif)
+![agent content capture](./assets/3-agent-content-capture.png)
 
 
 ## Grafana 仪表盘
